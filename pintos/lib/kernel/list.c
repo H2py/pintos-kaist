@@ -162,6 +162,7 @@ list_insert (struct list_elem *before, struct list_elem *elem) {
 	elem->next = before;
 	before->prev->next = elem;
 	before->prev = elem;
+	
 }
 
 /* Removes elements FIRST though LAST (exclusive) from their

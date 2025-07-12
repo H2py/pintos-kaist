@@ -94,7 +94,7 @@ static uint64_t gdt[3] = { 0, 0x00af9a000000ffff, 0x00cf92000000ffff };
    finishes. */
 void
 thread_init (void) {
-	ASSERT (intr_get_level () == INTR_OFF);
+	ASSERT (intr_get_level () == INTR_OFF); // intterrupt를 OFF하고 시작하는 이유?
 
 	/* Reload the temporal gdt for the kernel
 	 * This gdt does not include the user context.
@@ -137,7 +137,7 @@ thread_start (void) {
    Thus, this function runs in an external interrupt context. */
 void
 thread_tick (void) {
-	struct thread *t = thread_current ();
+	struct thread *t = thread_current (); 
 
 	/* Update statistics. */
 	if (t == idle_thread)

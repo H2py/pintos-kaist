@@ -33,6 +33,7 @@ struct gp_registers {
 	uint64_t rbx;
 	uint64_t rax;
 } __attribute__((packed));
+// __attribute__((packed))의 의미 구조체의 padding 동작을 없애라는 것
 
 struct intr_frame {
 	/* Pushed by intr_entry in intr-stubs.S.
