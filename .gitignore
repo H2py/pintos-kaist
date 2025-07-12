@@ -1,0 +1,51 @@
+# 컴파일 산출물
+*.o
+*.d
+*.obj
+*.exe
+*.out
+*.class
+
+# 링커 산출물, 라이브러리
+*.so
+*.a
+*.dll
+
+# 빌드 디렉토리
+build/
+bin/
+out/
+
+# 임시 파일
+*.tmp
+*.temp
+*.log
+
+# 백업 파일
+*~
+*.bak
+*.swp
+
+# IDE/에디터별 임시 파일
+
+# VSCode
+.vscode/
+
+# IntelliJ IDEA, Android Studio
+.idea/
+*.iml
+
+# Eclipse
+.project
+.classpath
+.settings/
+
+# MacOS 시스템 파일
+.DS_Store
+
+# Linux 시스템 파일
+*~
+
+# Python 관련 (참고용)
+__pycache__/
+*.pyc
