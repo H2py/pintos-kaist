@@ -102,7 +102,6 @@ timer_sleep (int64_t ticks) {
 		thread_sleep(start + ticks);
 	// while (timer_elapsed (start) < ticks)
 	// 	thread_yield ();
-
 }
 
 /* Suspends execution for approximately MS milliseconds. */
@@ -134,9 +133,9 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
 	thread_tick ();
-
+	
 	if(next_to_wake_ticks <= ticks)
-		wake_up();
+		wake_up(ticks);
 
 }
 
