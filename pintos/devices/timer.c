@@ -73,11 +73,11 @@ timer_calibrate (void) {
 /* Returns the number of timer ticks since the OS booted. */
 int64_t
 timer_ticks (void) {
-	enum intr_level old_level = intr_disable (); // disable로 만들고, 이전 status 반환
+	enum intr_level old_level = intr_disable (); 
 	int64_t t = ticks;
-	intr_set_level (old_level); // intr_disable()하고, 바로 intr_set_level(old_level)할거면 왜..?
+	intr_set_level (old_level); 
 	barrier ();
-	return t; // tick 반환
+	return t; 
 }
 
 /* Returns the number of timer ticks elapsed since THEN, which
@@ -89,16 +89,20 @@ timer_elapsed (int64_t then) {
 
 /* Suspends execution for approximately TICKS timer ticks. */
 /*
- * 스레드의 실행을 최소 (ticks) 만큼 중단하는 함수
- * sleep 이후, ready_list에 넣어주면 된다
+ * 1. 스레드의 실행을 최소 (ticks) 만큼 중단하는 함수
+ * 2. sleep 이후, ready_list에 넣어주면 된다
  */
 void
 timer_sleep (int64_t ticks) {
 	int64_t start = timer_ticks ();
 
 	ASSERT (intr_get_level () == INTR_ON);
-	while (timer_elapsed (start) < ticks)
-		thread_yield ();
+		
+	if (timer_elapsed(start) < ticks)
+		thread_sleep(start + ticks);
+	// while (timer_elapsed (start) < ticks)
+	// 	thread_yield ();
+
 }
 
 /* Suspends execution for approximately MS milliseconds. */
@@ -130,6 +134,10 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
 	thread_tick ();
+
+	if(next_to_wake_ticks <= ticks)
+		wake_up();
+
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
