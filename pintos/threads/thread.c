@@ -24,9 +24,15 @@
    Do not modify this value. */
 #define THREAD_BASIC 0xd42df210
 
+/* Initialize initial ticks to 0*/
+#define INIT_TICKS 0
+
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 static struct list ready_list;
+
+/* List of processes in THREAD_BLOCKED state*/
+static struct list sleep_list;
 
 /* Idle thread. */
 static struct thread *idle_thread;
@@ -44,6 +50,7 @@ static struct list destruction_req;
 static long long idle_ticks;    /* # of timer ticks spent idle. */
 static long long kernel_ticks;  /* # of timer ticks in kernel threads. */
 static long long user_ticks;    /* # of timer ticks in user programs. */
+long long next_to_wake_ticks = INT64_MAX; /* of timer ticks in next to wake up */
 
 /* Scheduling. */
 #define TIME_SLICE 4            /* # of timer ticks to give each thread. */
@@ -62,6 +69,8 @@ static void init_thread (struct thread *, const char *name, int priority);
 static void do_schedule(int status);
 static void schedule (void);
 static tid_t allocate_tid (void);
+void thread_sleep(int64_t ticks);
+static bool tick_less (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
 
 /* Returns true if T appears to point to a valid thread. */
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
@@ -94,7 +103,7 @@ static uint64_t gdt[3] = { 0, 0x00af9a000000ffff, 0x00cf92000000ffff };
    finishes. */
 void
 thread_init (void) {
-	ASSERT (intr_get_level () == INTR_OFF);
+	ASSERT (intr_get_level () == INTR_OFF); // intterrupt를 OFF하고 시작하는 이유?
 
 	/* Reload the temporal gdt for the kernel
 	 * This gdt does not include the user context.
@@ -105,9 +114,10 @@ thread_init (void) {
 	};
 	lgdt (&gdt_ds);
 
-	/* Init the globla thread context */
+	/* Init the global thread context */
 	lock_init (&tid_lock);
 	list_init (&ready_list);
+	list_init(&sleep_list);
 	list_init (&destruction_req);
 
 	/* Set up a thread structure for the running thread. */
@@ -137,7 +147,7 @@ thread_start (void) {
    Thus, this function runs in an external interrupt context. */
 void
 thread_tick (void) {
-	struct thread *t = thread_current ();
+	struct thread *t = thread_current (); 
 
 	/* Update statistics. */
 	if (t == idle_thread)
@@ -296,16 +306,16 @@ thread_exit (void) {
    may be scheduled again immediately at the scheduler's whim. */
 void
 thread_yield (void) {
-	struct thread *curr = thread_current ();
+	struct thread *curr = thread_current (); // 현재 스레드를 가져옵니다
 	enum intr_level old_level;
 
 	ASSERT (!intr_context ());
 
-	old_level = intr_disable ();
+	old_level = intr_disable (); // INTR_ON로 만들고, old_level INTR_OFF
 	if (curr != idle_thread)
-		list_push_back (&ready_list, &curr->elem);
-	do_schedule (THREAD_READY);
-	intr_set_level (old_level);
+		list_push_back (&ready_list, &curr->elem); // 현재 스레드를 가져옴 + ready_list에 넣어버림
+	do_schedule (THREAD_READY); // do_schedule
+	intr_set_level (old_level); // INTR_ON으로 복구함
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
@@ -394,6 +404,29 @@ kernel_thread (thread_func *function, void *aux) {
 	thread_exit ();       /* If function() returns, kill the thread. */
 }
 
+/* Function used as changing status THREAD_RUNNING to THREAD_BLCOKED
+ * 
+ */
+void thread_sleep(int64_t ticks)
+{
+	struct thread *curr = thread_current();
+	enum intr_level old_level = intr_disable();
+
+	if (curr != idle_thread)
+	{
+		// curr->status = THREAD_BLOCKED;
+		curr->sleep_ticks = ticks;
+		list_insert_ordered(&sleep_list, &curr->elem, tick_less, NULL);
+
+		if(next_to_wake_ticks > ticks)
+			next_to_wake_ticks = ticks; // TODO : initialize next_to_wake_ticks where proper location
+		
+	}
+	printf("%d\n", list_size(&sleep_list));
+	do_schedule(THREAD_BLOCKED);
+	intr_set_level(old_level);
+}
+
 
 /* Does basic initialization of T as a blocked thread named
    NAME. */
@@ -409,6 +442,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->tf.rsp = (uint64_t) t + PGSIZE - sizeof (void *);
 	t->priority = priority;
 	t->magic = THREAD_MAGIC;
+	t->sleep_ticks = INIT_TICKS;
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
@@ -587,4 +621,41 @@ allocate_tid (void) {
 	lock_release (&tid_lock);
 
 	return tid;
+}
+
+/* Returns true if ticks A is less than ticks B, false otherwise.*/
+static bool tick_less (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED)
+{
+  const struct thread *a = list_entry(a_, struct thread, elem);
+  const struct thread *b = list_entry(b_, struct thread, elem);
+
+  return a->sleep_ticks < b->sleep_ticks;
+}
+
+/* move the thread from the sleep_list to the ready_list */
+void
+wake_up() {
+	struct list_elem *e;
+	enum intr_level old_level = intr_disable();
+
+	for(e = list_begin(&sleep_list); e != list_end(&sleep_list); e = list_remove(e))
+	{
+		if(!list_empty(&sleep_list)) break;
+		printf("<2>\n");
+
+		struct thread* curr = list_entry(e, struct thread, elem);
+		
+		if(curr->sleep_ticks <= next_to_wake_ticks)
+		{
+			list_push_back(&ready_list, &curr->elem);
+			curr->status = THREAD_READY;
+		}
+		else
+			break;
+	}
+
+	if(!list_empty(&sleep_list))
+		next_to_wake_ticks = list_entry(list_begin(&sleep_list), struct thread, elem)->sleep_ticks;
+	intr_set_level(old_level);
+	// schedule();
 }

@@ -21,7 +21,7 @@
 /* Creates an gate that invokes FUNCTION.
 
    The gate has descriptor privilege level DPL, meaning that it
-   can be invoked intentionally when the processor is in the DPL
+   can be invoked intentionally when the processor is in the DP2L
    or lower-numbered ring.  In practice, DPL==3 allows user mode
    to call into the gate and DPL==0 prevents such calls.  Faults
    and exceptions that occur in user mode still cause gates with
@@ -268,7 +268,7 @@ intr_yield_on_return (void) {
 	ASSERT (intr_context ());
 	yield_on_return = true;
 }
-
+
 /* 8259A Programmable Interrupt Controller. */
 
 /* Every PC has two 8259A Programmable Interrupt Controller (PIC)
