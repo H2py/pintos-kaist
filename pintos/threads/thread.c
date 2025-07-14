@@ -32,6 +32,7 @@
 static struct list ready_list;
 
 /* List of processes in THREAD_BLOCKED state*/
+// static struct list sleep_list;
 static struct list sleep_list;
 
 /* Idle thread. */
@@ -50,7 +51,7 @@ static struct list destruction_req;
 static long long idle_ticks;    /* # of timer ticks spent idle. */
 static long long kernel_ticks;  /* # of timer ticks in kernel threads. */
 static long long user_ticks;    /* # of timer ticks in user programs. */
-long long next_to_wake_ticks = INT64_MAX; /* of timer ticks in next to wake up */
+int64_t next_to_wake_ticks = INT64_MAX; /* of timer ticks in next to wake up */
 
 /* Scheduling. */
 #define TIME_SLICE 4            /* # of timer ticks to give each thread. */
@@ -69,7 +70,6 @@ static void init_thread (struct thread *, const char *name, int priority);
 static void do_schedule(int status);
 static void schedule (void);
 static tid_t allocate_tid (void);
-void thread_sleep(int64_t ticks);
 static bool tick_less (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
 
 /* Returns true if T appears to point to a valid thread. */
@@ -103,7 +103,7 @@ static uint64_t gdt[3] = { 0, 0x00af9a000000ffff, 0x00cf92000000ffff };
    finishes. */
 void
 thread_init (void) {
-	ASSERT (intr_get_level () == INTR_OFF); // intterrupt를 OFF하고 시작하는 이유?
+	ASSERT (intr_get_level () == INTR_OFF);
 
 	/* Reload the temporal gdt for the kernel
 	 * This gdt does not include the user context.
@@ -409,21 +409,19 @@ kernel_thread (thread_func *function, void *aux) {
  */
 void thread_sleep(int64_t ticks)
 {
-	struct thread *curr = thread_current();
 	enum intr_level old_level = intr_disable();
+	struct thread *curr = thread_current();
 
 	if (curr != idle_thread)
 	{
-		// curr->status = THREAD_BLOCKED;
 		curr->sleep_ticks = ticks;
 		list_insert_ordered(&sleep_list, &curr->elem, tick_less, NULL);
 
 		if(next_to_wake_ticks > ticks)
 			next_to_wake_ticks = ticks; // TODO : initialize next_to_wake_ticks where proper location
 		
+		do_schedule(THREAD_BLOCKED);
 	}
-	printf("%d\n", list_size(&sleep_list));
-	do_schedule(THREAD_BLOCKED);
 	intr_set_level(old_level);
 }
 
@@ -634,28 +632,23 @@ static bool tick_less (const struct list_elem *a_, const struct list_elem *b_, v
 
 /* move the thread from the sleep_list to the ready_list */
 void
-wake_up() {
-	struct list_elem *e;
+wake_up(int64_t cur_ticks) {
 	enum intr_level old_level = intr_disable();
+	struct list_elem *e = list_begin(&sleep_list);
 
-	for(e = list_begin(&sleep_list); e != list_end(&sleep_list); e = list_remove(e))
+	while(e != list_end(&sleep_list))
 	{
-		if(!list_empty(&sleep_list)) break;
-		printf("<2>\n");
-
 		struct thread* curr = list_entry(e, struct thread, elem);
-		
-		if(curr->sleep_ticks <= next_to_wake_ticks)
+
+		if(curr->sleep_ticks <= cur_ticks)
 		{
-			list_push_back(&ready_list, &curr->elem);
-			curr->status = THREAD_READY;
-		}
-		else
+			e = list_remove(e);
+			thread_unblock(curr);
+		} else
 			break;
 	}
 
 	if(!list_empty(&sleep_list))
 		next_to_wake_ticks = list_entry(list_begin(&sleep_list), struct thread, elem)->sleep_ticks;
 	intr_set_level(old_level);
-	// schedule();
 }
