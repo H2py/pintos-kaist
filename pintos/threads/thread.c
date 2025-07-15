@@ -71,6 +71,7 @@ static void do_schedule(int status);
 static void schedule (void);
 static tid_t allocate_tid (void);
 static bool tick_less (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
+static bool priority_first (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
 
 /* Returns true if T appears to point to a valid thread. */
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
@@ -415,7 +416,8 @@ void thread_sleep(int64_t ticks)
 	if (curr != idle_thread)
 	{
 		curr->sleep_ticks = ticks;
-		list_insert_ordered(&sleep_list, &curr->elem, tick_less, NULL);
+		// list_insert_ordered(&sleep_list, &curr->elem, tick_less, NULL);
+		list_insert_ordered(&sleep_list,&curr->elem,priority_first,NULL);
 
 		if(next_to_wake_ticks > ticks)
 			next_to_wake_ticks = ticks; // TODO : initialize next_to_wake_ticks where proper location
@@ -629,6 +631,13 @@ static bool tick_less (const struct list_elem *a_, const struct list_elem *b_, v
 
   return a->sleep_ticks < b->sleep_ticks;
 }
+static bool priority_first (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED)
+{
+	const struct thread *a = list_entry(a_,struct thread,elem);
+	const struct thread *b = list_entry(b_,struct thread,elem);
+
+	return a->priority > b->priority;
+}
 
 /* move the thread from the sleep_list to the ready_list */
 void
@@ -644,11 +653,13 @@ wake_up(int64_t cur_ticks) {
 		{
 			e = list_remove(e);
 			thread_unblock(curr);
-		} else
-			break;
+		} 
+		else{
+			e = e->next;
+		}
 	}
 
-	if(!list_empty(&sleep_list))
-		next_to_wake_ticks = list_entry(list_begin(&sleep_list), struct thread, elem)->sleep_ticks;
+	// if(!list_empty(&sleep_list))
+	// 	next_to_wake_ticks = list_entry(list_begin(&sleep_list), struct thread, elem)->sleep_ticks;
 	intr_set_level(old_level);
 }
