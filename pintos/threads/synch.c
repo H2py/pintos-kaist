@@ -40,7 +40,9 @@
    decrement it.
 
    - up or "V": increment the value (and wake up one waiting
-   thread, if any). */
+   thread, if any). 
+   - semaphore를 받고, sema value를 value로 선언함, list_init 실행
+   */
 void
 sema_init (struct semaphore *sema, unsigned value) {
 	ASSERT (sema != NULL);
@@ -56,7 +58,11 @@ sema_init (struct semaphore *sema, unsigned value) {
    interrupt handler.  This function may be called with
    interrupts disabled, but if it sleeps then the next scheduled
    thread will probably turn interrupts back on. This is
-   sema_down function. */
+   sema_down function. 
+   
+   sema_down은 intr_disable을 설정하고, 만약, 이미 sema->value == 0이라면, lush_push_back을 이용해서 wait_list에 넣음
+   wait_list는 각 sema마다 존재함, 이후 thread_blcok 처리
+   */
 void
 sema_down (struct semaphore *sema) {
 	enum intr_level old_level;
@@ -66,7 +72,8 @@ sema_down (struct semaphore *sema) {
 
 	old_level = intr_disable ();
 	while (sema->value == 0) {
-		list_push_back (&sema->waiters, &thread_current ()->elem);
+		list_insert_ordered(&sema->waiters, &thread_current()->elem, priority_first, NULL);
+		// list_push_back (&sema->waiters, &thread_current ()->elem); // TODO : 우선순위 방식으로 변경하기
 		thread_block ();
 	}
 	sema->value--;
@@ -77,7 +84,11 @@ sema_down (struct semaphore *sema) {
    semaphore is not already 0.  Returns true if the semaphore is
    decremented, false otherwise.
 
-   This function may be called from an interrupt handler. */
+   This function may be called from an interrupt handler. 
+   interrupt handler에서 실행되는걸 보아, sema의 잠금 여부를 확인하는 듯
+   만약, sema->value > 0이면, sema->value를 1낮추고, true를 반환한다
+   그렇지 않으면 success = false를 반환함
+   */
 bool
 sema_try_down (struct semaphore *sema) {
 	enum intr_level old_level;
@@ -101,7 +112,9 @@ sema_try_down (struct semaphore *sema) {
 /* Up or "V" operation on a semaphore.  Increments SEMA's value
    and wakes up one thread of those waiting for SEMA, if any.
 
-   This function may be called from an interrupt handler. */
+   This function may be called from an interrupt handler. 
+   Sema_up은 waiters에서 기다리고 있던, thread 중 가장 우선순위가 높은 스레드의 block을 해제한다  
+   */
 void
 sema_up (struct semaphore *sema) {
 	enum intr_level old_level;
@@ -150,7 +163,7 @@ sema_test_helper (void *sema_) {
 		sema_up (&sema[1]);
 	}
 }
-
+
 /* Initializes LOCK.  A lock can be held by at most a single
    thread at any given time.  Our locks are not "recursive", that
    is, it is an error for the thread currently holding a lock to
@@ -235,7 +248,7 @@ lock_held_by_current_thread (const struct lock *lock) {
 
 	return lock->holder == thread_current ();
 }
-
+
 /* One semaphore in a list. */
 struct semaphore_elem {
 	struct list_elem elem;              /* List element. */
@@ -271,7 +284,19 @@ cond_init (struct condition *cond) {
    This function may sleep, so it must not be called within an
    interrupt handler.  This function may be called with
    interrupts disabled, but interrupts will be turned back on if
-   we need to sleep. */
+   we need to sleep.
+   
+   Mesa style : thread A cond_wait() , thread B cond_signal()
+   A는 ready state가 되지만, 즉시 실행되진 않음
+   B가 lock을 놓고 난 뒤에야, A가 lock을 획득할 수 있기 때문에 그때 실행됨
+   signal 받더라도, 다른 스레드들이 먼저 실행될 수 있고, 이때 조건이 변경됨
+   cond_wait() 뒤에는 while문으로 재확인함
+
+   lock_acquire(&lock);
+   while(!condition_is_true())
+		cond_wait(&cond, &lock);
+	lock_release(&lock);
+   */
 void
 cond_wait (struct condition *cond, struct lock *lock) {
 	struct semaphore_elem waiter;
@@ -282,7 +307,8 @@ cond_wait (struct condition *cond, struct lock *lock) {
 	ASSERT (lock_held_by_current_thread (lock));
 
 	sema_init (&waiter.semaphore, 0);
-	list_push_back (&cond->waiters, &waiter.elem);
+	list_insert_ordered(&cond->waiters, &waiter.elem, priority_first, NULL);
+	// list_push_back (&cond->waiters, &waiter.elem);
 	lock_release (lock);
 	sema_down (&waiter.semaphore);
 	lock_acquire (lock);

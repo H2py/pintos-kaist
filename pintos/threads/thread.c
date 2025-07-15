@@ -71,7 +71,8 @@ static void do_schedule(int status);
 static void schedule (void);
 static tid_t allocate_tid (void);
 static bool tick_less (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
-static bool priority_first (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
+bool priority_first (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
+static bool is_higher_priority_than_current(struct thread *new_t);
 
 /* Returns true if T appears to point to a valid thread. */
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
@@ -250,8 +251,13 @@ thread_unblock (struct thread *t) {
 	ASSERT (is_thread (t));
 
 	old_level = intr_disable ();
-	ASSERT (t->status == THREAD_BLOCKED);
-	list_push_back (&ready_list, &t->elem);
+	ASSERT (t->status == THREAD_BLOCKED); // running_thread랑 priority를 비교함, 들어오는게 더 크면 yield 실행 아니면 insert 수행
+	list_insert_ordered(&ready_list, &t->elem, priority_first, NULL);
+	
+	if (is_higher_priority_than_current(t)) // 현재 스레드가 실행 중인 스레드 우선순위보다 높다면, 스케줄링 실행
+		thread_yield();
+		
+	// list_push_back (&ready_list, &t->elem);
 	t->status = THREAD_READY;
 	intr_set_level (old_level);
 }
@@ -304,7 +310,9 @@ thread_exit (void) {
 }
 
 /* Yields the CPU.  The current thread is not put to sleep and
-   may be scheduled again immediately at the scheduler's whim. */
+   may be scheduled again immediately at the scheduler's whim.
+   현재 스레드를 ready_list에 삽입하고 do_schedule을 실행
+   */
 void
 thread_yield (void) {
 	struct thread *curr = thread_current (); // 현재 스레드를 가져옵니다
@@ -314,7 +322,8 @@ thread_yield (void) {
 
 	old_level = intr_disable (); // INTR_ON로 만들고, old_level INTR_OFF
 	if (curr != idle_thread)
-		list_push_back (&ready_list, &curr->elem); // 현재 스레드를 가져옴 + ready_list에 넣어버림
+		list_insert_ordered(&ready_list, &curr->elem, priority_first, NULL);
+		// list_push_back (&ready_list, &curr->elem); 
 	do_schedule (THREAD_READY); // do_schedule
 	intr_set_level (old_level); // INTR_ON으로 복구함
 }
@@ -322,7 +331,16 @@ thread_yield (void) {
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) {
-	thread_current ()->priority = new_priority;
+	if(thread_current()->priority > new_priority) // priority down
+	{
+		struct thread* begin = list_entry(list_begin(&ready_list), struct thread, elem);
+		
+		thread_current ()->priority = new_priority;
+		if(is_higher_priority_than_current(begin))
+			thread_yield();
+	}
+	else
+		thread_current ()->priority = new_priority;
 }
 
 /* Returns the current thread's priority. */
@@ -558,7 +576,9 @@ thread_launch (struct thread *th) {
 /* Schedules a new process. At entry, interrupts must be off.
  * This function modify current thread's status to status and then
  * finds another thread to run and switches to it.
- * It's not safe to call printf() in the schedule(). */
+ * It's not safe to call printf() in the schedule(). 
+ * 현재 스레드의 status를 변경함, 이후 다른 스레드로 교체(schedule)한다
+ * */
 static void
 do_schedule(int status) {
 	ASSERT (intr_get_level () == INTR_OFF);
@@ -573,7 +593,7 @@ do_schedule(int status) {
 }
 
 static void
-schedule (void) {
+schedule (void) { // 현재 스레드를 가져옴, 다음에 실행될 스레드를 가져옴(RUNNING으로 전환)
 	struct thread *curr = running_thread ();
 	struct thread *next = next_thread_to_run ();
 
@@ -606,7 +626,7 @@ schedule (void) {
 
 		/* Before switching the thread, we first save the information
 		 * of current running. */
-		thread_launch (next);
+		thread_launch (next); 
 	}
 }
 
@@ -631,7 +651,7 @@ static bool tick_less (const struct list_elem *a_, const struct list_elem *b_, v
 
   return a->sleep_ticks < b->sleep_ticks;
 }
-static bool priority_first (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED)
+bool priority_first (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED)
 {
 	const struct thread *a = list_entry(a_,struct thread,elem);
 	const struct thread *b = list_entry(b_,struct thread,elem);
@@ -656,10 +676,16 @@ wake_up(int64_t cur_ticks) {
 		} 
 		else{
 			e = e->next;
+			// break;
 		}
 	}
 
 	// if(!list_empty(&sleep_list))
 	// 	next_to_wake_ticks = list_entry(list_begin(&sleep_list), struct thread, elem)->sleep_ticks;
 	intr_set_level(old_level);
+}
+
+static bool is_higher_priority_than_current(struct thread *new_t)
+{
+	return new_t->priority > thread_current()->priority;
 }
