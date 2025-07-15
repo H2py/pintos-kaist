@@ -148,6 +148,6 @@ void do_iret (struct intr_frame *tf);
 
 void wake_up(int64_t cur_ticks);
 void thread_sleep(int64_t ticks);
-void is_thread_yield(void);
+void yield_to_higher_priority(void);
 
 #endif /* threads/thread.h */

@@ -32,6 +32,8 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
+static bool sem_priority_first (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
+
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
    manipulating it:
@@ -71,9 +73,8 @@ sema_down (struct semaphore *sema) {
 	ASSERT (!intr_context ());
 
 	old_level = intr_disable ();
-	while (sema->value == 0) {
+	while (sema->value == 0) { // sema->value == 0이면, wait_list에 넣음
 		list_insert_ordered(&sema->waiters, &thread_current()->elem, priority_first, NULL);
-		// list_push_back (&sema->waiters, &thread_current ()->elem); // TODO : 우선순위 방식으로 변경하기
 		thread_block ();
 	}
 	sema->value--;
@@ -126,7 +127,7 @@ sema_up (struct semaphore *sema) {
 		thread_unblock (list_entry (list_pop_front (&sema->waiters),
 					struct thread, elem));
 	sema->value++;
-   is_thread_yield();
+   yield_to_higher_priority(); // readylist에 한정
 	intr_set_level (old_level);
 }
 
@@ -254,6 +255,7 @@ lock_held_by_current_thread (const struct lock *lock) {
 struct semaphore_elem {
 	struct list_elem elem;              /* List element. */
 	struct semaphore semaphore;         /* This semaphore. */
+   int priority;
 };
 
 /* Initializes condition variable COND.  A condition variable
@@ -288,6 +290,7 @@ cond_init (struct condition *cond) {
    we need to sleep.
    
    Mesa style : thread A cond_wait() , thread B cond_signal()
+
    A는 ready state가 되지만, 즉시 실행되진 않음
    B가 lock을 놓고 난 뒤에야, A가 lock을 획득할 수 있기 때문에 그때 실행됨
    signal 받더라도, 다른 스레드들이 먼저 실행될 수 있고, 이때 조건이 변경됨
@@ -301,6 +304,7 @@ cond_init (struct condition *cond) {
 void
 cond_wait (struct condition *cond, struct lock *lock) {
 	struct semaphore_elem waiter;
+   waiter.priority = thread_current()->priority;
 
 	ASSERT (cond != NULL);
 	ASSERT (lock != NULL);
@@ -308,11 +312,13 @@ cond_wait (struct condition *cond, struct lock *lock) {
 	ASSERT (lock_held_by_current_thread (lock));
 
 	sema_init (&waiter.semaphore, 0);
-	list_insert_ordered(&cond->waiters, &waiter.elem, priority_first, NULL);
-	list_push_back (&cond->waiters, &waiter.elem);
+	list_insert_ordered(&cond->waiters, &waiter.elem, sem_priority_first, NULL); // lock acquire을 기다리는 waitlist
+   
+	// list_push_back (&cond->waiters, &waiter.elem);
 	lock_release (lock);
-	sema_down (&waiter.semaphore);
-	lock_acquire (lock);
+	sema_down (&waiter.semaphore); // lock acquire을 기다리는 waitlist
+   
+   lock_acquire (lock);
 }
 
 /* If any threads are waiting on COND (protected by LOCK), then
@@ -330,12 +336,14 @@ cond_signal (struct condition *cond, struct lock *lock UNUSED) {
 	ASSERT (lock_held_by_current_thread (lock));
 
 	if (!list_empty (&cond->waiters))
+   {
 		sema_up (&list_entry (list_pop_front (&cond->waiters),
-					struct semaphore_elem, elem)->semaphore);
+         struct semaphore_elem, elem)->semaphore);
+   }
 }
 
 /* Wakes up all threads, if any, waiting on COND (protected by
-   LOCK).  LOCK must be held before calling this function.
+   LOCK). LOCK must be held before calling this function.
 
    An interrupt handler cannot acquire a lock, so it does not
    make sense to try to signal a condition variable within an
@@ -347,4 +355,12 @@ cond_broadcast (struct condition *cond, struct lock *lock) {
 
 	while (!list_empty (&cond->waiters))
 		cond_signal (cond, lock);
+}
+
+static bool sem_priority_first (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED)
+{
+	const struct semaphore_elem *a = list_entry(a_,struct semaphore_elem, elem);
+	const struct semaphore_elem *b = list_entry(b_,struct semaphore_elem, elem);
+
+	return a->priority > b->priority;
 }

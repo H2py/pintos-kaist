@@ -219,7 +219,7 @@ thread_create (const char *name, int priority,
 
 	/* Add to run queue. */
 	thread_unblock (t);
-	is_thread_yield();
+	yield_to_higher_priority();
 
 	return tid;
 }
@@ -333,7 +333,7 @@ thread_yield (void) {
 void
 thread_set_priority (int new_priority) {
 	thread_current ()->priority = new_priority;
-	is_thread_yield();
+	yield_to_higher_priority();
 }
 
 /* Returns the current thread's priority. */
@@ -673,8 +673,6 @@ wake_up(int64_t cur_ticks) {
 		}
 	}
 
-	// if(!list_empty(&sleep_list))
-	// 	next_to_wake_ticks = list_entry(list_begin(&sleep_list), struct thread, elem)->sleep_ticks;
 	intr_set_level(old_level);
 }
 
@@ -683,8 +681,7 @@ static bool is_higher_priority_than_current(struct thread *new_t)
 	return new_t->priority > thread_current()->priority;
 }
 
-// is_thread_yield보다는 yield_to_higher_priority()가 나을 듯..?
-void is_thread_yield(void)
+void yield_to_higher_priority(void)
 {
 	if(!list_empty(&ready_list))
 	{	
