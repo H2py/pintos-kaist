@@ -683,6 +683,7 @@ static bool is_higher_priority_than_current(struct thread *new_t)
 	return new_t->priority > thread_current()->priority;
 }
 
+// is_thread_yield보다는 yield_to_higher_priority()가 나을 듯..?
 void is_thread_yield(void)
 {
 	if(!list_empty(&ready_list))
