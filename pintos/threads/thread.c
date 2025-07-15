@@ -74,6 +74,7 @@ static bool tick_less (const struct list_elem *a_, const struct list_elem *b_, v
 bool priority_first (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
 static bool is_higher_priority_than_current(struct thread *new_t);
 
+
 /* Returns true if T appears to point to a valid thread. */
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
 
@@ -218,6 +219,7 @@ thread_create (const char *name, int priority,
 
 	/* Add to run queue. */
 	thread_unblock (t);
+	is_thread_yield();
 
 	return tid;
 }
@@ -252,13 +254,12 @@ thread_unblock (struct thread *t) {
 
 	old_level = intr_disable ();
 	ASSERT (t->status == THREAD_BLOCKED); // running_thread랑 priority를 비교함, 들어오는게 더 크면 yield 실행 아니면 insert 수행
-	list_insert_ordered(&ready_list, &t->elem, priority_first, NULL);
-	
-	if (is_higher_priority_than_current(t)) // 현재 스레드가 실행 중인 스레드 우선순위보다 높다면, 스케줄링 실행
-		thread_yield();
-		
 	// list_push_back (&ready_list, &t->elem);
+	list_insert_ordered(&ready_list, &t->elem, priority_first, NULL);
 	t->status = THREAD_READY;
+
+	// if(is_higher_priority_than_current(t) && t != idle_thread)
+	// 	thread_yield();
 	intr_set_level (old_level);
 }
 
@@ -331,16 +332,8 @@ thread_yield (void) {
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) {
-	if(thread_current()->priority > new_priority) // priority down
-	{
-		struct thread* begin = list_entry(list_begin(&ready_list), struct thread, elem);
-		
-		thread_current ()->priority = new_priority;
-		if(is_higher_priority_than_current(begin))
-			thread_yield();
-	}
-	else
-		thread_current ()->priority = new_priority;
+	thread_current ()->priority = new_priority;
+	is_thread_yield();
 }
 
 /* Returns the current thread's priority. */
@@ -688,4 +681,15 @@ wake_up(int64_t cur_ticks) {
 static bool is_higher_priority_than_current(struct thread *new_t)
 {
 	return new_t->priority > thread_current()->priority;
+}
+
+void is_thread_yield(void)
+{
+	if(!list_empty(&ready_list))
+	{	
+		struct thread* begin = list_entry(list_begin(&ready_list), struct thread, elem);
+			
+		if(is_higher_priority_than_current(begin))
+			thread_yield();
+	}
 }

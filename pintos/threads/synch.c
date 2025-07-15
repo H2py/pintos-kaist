@@ -126,6 +126,7 @@ sema_up (struct semaphore *sema) {
 		thread_unblock (list_entry (list_pop_front (&sema->waiters),
 					struct thread, elem));
 	sema->value++;
+   is_thread_yield();
 	intr_set_level (old_level);
 }
 
@@ -308,7 +309,7 @@ cond_wait (struct condition *cond, struct lock *lock) {
 
 	sema_init (&waiter.semaphore, 0);
 	list_insert_ordered(&cond->waiters, &waiter.elem, priority_first, NULL);
-	// list_push_back (&cond->waiters, &waiter.elem);
+	list_push_back (&cond->waiters, &waiter.elem);
 	lock_release (lock);
 	sema_down (&waiter.semaphore);
 	lock_acquire (lock);
