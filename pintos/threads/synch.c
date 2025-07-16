@@ -132,6 +132,22 @@ sema_up (struct semaphore *sema) {
 }
 
 static void sema_test_helper (void *sema_);
+static bool should_donation(int priority);
+static void priority_donation(struct lock*);
+
+static bool
+should_donation(int target_priority){
+   return thread_current()->priority > target_priority;
+}
+static void
+priority_donation(struct lock* lock){
+   
+   int donation_priority = list_entry(list_begin(&lock->holder->donor_list),struct thread,elem)->priority;
+   
+   printf("donate priority : %d\n",donation_priority);
+   
+   lock->holder->priority = donation_priority;
+}
 
 /* Self-test for semaphores that makes control "ping-pong"
    between a pair of threads.  Insert calls to printf() to see
@@ -203,7 +219,25 @@ lock_acquire (struct lock *lock) {
 	ASSERT (!intr_context ());
 	ASSERT (!lock_held_by_current_thread (lock));
 
-	sema_down (&lock->semaphore);
+   // printf("%d\n",lock->semaphore.value);
+   if(sema_try_down(&lock->semaphore)){
+      
+   }
+   else{
+      enum intr_level old_level = intr_disable();
+      thread_current()->wait_on_lock = lock;
+
+      int target_priority = lock->holder->origin_priority;
+
+      if(should_donation(target_priority)){
+         //do donation
+         list_insert_ordered(&lock->holder->donor_list,&thread_current()->elem,priority_first,NULL);
+         priority_donation(lock);
+      }
+      intr_set_level(old_level);
+      sema_down (&lock->semaphore);
+   }
+
 	lock->holder = thread_current ();
 }
 
@@ -236,8 +270,26 @@ void
 lock_release (struct lock *lock) {
 	ASSERT (lock != NULL);
 	ASSERT (lock_held_by_current_thread (lock));
+   int new_priority;
+   enum intr_level old_level = intr_disable();
 
-	lock->holder = NULL;
+   if(!list_empty(&lock->holder->donor_list)){
+      list_pop_front(&lock->holder->donor_list);
+
+      if(!list_empty(&lock->holder->donor_list)){
+         new_priority = list_entry(list_begin(&lock->holder->donor_list),struct thread,elem)->priority;
+         // thread_current()->priority = new_priority;
+      }
+      else{
+         new_priority = lock->holder->origin_priority;
+         // thread_current()->priority = thread_current()->origin_priority;
+      }
+      thread_set_priority(new_priority);
+   }
+	
+   lock->holder = NULL;
+
+   intr_set_level(old_level);
 	sema_up (&lock->semaphore);
 }
 

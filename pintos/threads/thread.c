@@ -332,7 +332,7 @@ thread_yield (void) {
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) {
-	thread_current ()->priority = new_priority;
+	thread_current()->priority = new_priority;
 	yield_to_higher_priority();
 }
 
@@ -454,6 +454,9 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->priority = priority;
 	t->magic = THREAD_MAGIC;
 	t->sleep_ticks = INIT_TICKS;
+	t->origin_priority = priority;
+	t->wait_on_lock = NULL;
+	list_init(&t->donor_list);
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
