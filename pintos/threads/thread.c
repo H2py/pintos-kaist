@@ -324,7 +324,6 @@ thread_yield (void) {
 	old_level = intr_disable (); // INTR_ON로 만들고, old_level INTR_OFF
 	if (curr != idle_thread)
 		list_insert_ordered(&ready_list, &curr->elem, priority_first, NULL);
-		// list_push_back (&ready_list, &curr->elem); 
 	do_schedule (THREAD_READY); // do_schedule
 	intr_set_level (old_level); // INTR_ON으로 복구함
 }
@@ -332,7 +331,8 @@ thread_yield (void) {
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) {
-	thread_current()->priority = new_priority;
+	thread_current ()->priority = new_priority;
+	// refresh_priority();
 	yield_to_higher_priority();
 }
 
@@ -454,9 +454,13 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->priority = priority;
 	t->magic = THREAD_MAGIC;
 	t->sleep_ticks = INIT_TICKS;
+
+	/* Initialize the thread's original priority for donation. */
+
 	t->origin_priority = priority;
 	t->wait_on_lock = NULL;
 	list_init(&t->donor_list);
+
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
