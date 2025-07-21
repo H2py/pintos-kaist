@@ -199,7 +199,7 @@ process_exec (void *f_name) {
     success = load (file_name, &_if);
 
 	//hex_dump() 여기서 헥스 덤프로 스택 메모리 찍어보면 될듯
-	hex_dump((int64_t)_if.rsp,_if.rsp,sizeof(_if.rsp),true);
+	// hex_dump((int64_t)_if.rsp,_if.rsp,sizeof(_if.rsp),true);
 
     // 5. 실패 시 처리
     palloc_free_page (file_name);
@@ -460,16 +460,20 @@ load (const char *file_name, struct intr_frame *if_) {
 	/* Start address. */
 	if_->rip = ehdr.e_entry;
 
+	enum intr_level old_level = intr_disable();
 	//argc는 마지막 null 개수까지 포함하고 있다.
 	// TODO 여기서 Argc 계산이 틀렸을 수도 있음. 인덱싱 계산 확인도 해보면 좋을듯!
 	for(i = argc - 1; i >= 0; i--){	//스택에 파싱한 인자 값 저장
 		length = strlen(argv[i]) + 1; 	// FIX NULL 문자 전까지만 들어가고 있었음,,, NULL까지 들어가야됨
+
 		if_->rsp -= length;
+		printf("%s : ",argv[i]);
+		printf("%p\n",if_->rsp);
 		argv_addrs[i] = if_->rsp;
 		memcpy(if_->rsp, argv[i],(sizeof(char) * length));	// TODO argv[i]에 NULL이 포함되는지 봐야됨
 	}
 
-	hex_dump(if_->rsp,argv[0],sizeof(argv),true);	// FIX NULL 아주 잘 들어가고 있음
+	hex_dump(if_->rsp,if_->rsp,USER_STACK - if_->rsp,true);	// FIX NULL 아주 잘 들어가고 있음
 
 	if_->rsp -= if_->rsp % 8;	//padding
 
@@ -477,21 +481,32 @@ load (const char *file_name, struct intr_frame *if_) {
 	
 	/* TODO : 배열에 있는 argument 주소를 반복문 돌려서 argc 만큼 스택에 넣어주기	-> 문제가 발생함
 	TODO : 그 다음에 rdi, rsi에도 argc 값과 argv[0]의 스택 주소 넣어주기*/
+	// char * temp;
 	for(i = argc -1 ; i>=0; i--){	//argv 인자들 메모리 주소 넣기
 		if_->rsp -= sizeof(argv_addrs[i]);	// TODO 이 때 rsp는 0x4747FFE0 임
 		// TODO 여기서 rsp는 0x4747FFD7
-		// debug_backtrace();
-		memcpy(if_->rsp,argv_addrs[i],sizeof(argv_addrs[i]));	// TODO 여기서 잘못된 메모리 참조 예외 발생!
+
+		// *(uintptr_t *)if_->rsp = (uintptr_t)argv_addrs[i];
+		memcpy(if_->rsp,&argv_addrs[i],sizeof(char *));	// TODO 여기서 잘못된 메모리 참조 예외 발생!
 	}
 
-	if_->rsp -= sizeof(char**);
-	memcpy(&if_->rsp,argv_addrs[0],sizeof(char**));	//argv 주소 넣기
+	if_->rsp -= sizeof(char*);
+	// *(uintptr_t *)if_->rsp = (uintptr_t)argv_addrs[0];
+	memcpy(if_->rsp,&argv_addrs[0],sizeof(char*));	//argv 주소 넣기
 
 	if_->rsp -= sizeof(int);
-	memcpy(if_->rsp, argc, sizeof(int));	//argc 넣기
+	// *(uintptr_t *)if_->rsp = argc;
+	memcpy(if_->rsp, &argc, sizeof(int));	//argc 넣기
 
 	if_->rsp -= sizeof(char *);//이렇게만 해도 되려나? 일단 return 주소로 0을 처리함
 
+	// FIX 레지스터 값 넣어주는 부분.
+	if_->R.rsi = argv_addrs[0];
+	if_->R.rdi = argc;
+	
+	hex_dump(if_->rsp,if_->rsp,USER_STACK - if_->rsp,true);
+
+	intr_set_level(old_level);
 	/* TODO: Your code goes here.
 		TODO: file_name const 풀기 -> 변경해야됨
 		TODO: file_name = strtok_r(file_name," ",&save_ptr)
