@@ -83,10 +83,10 @@ filesys_open (const char *name) {
 	struct inode *inode = NULL;
 
 	if (dir != NULL)
-		dir_lookup (dir, name, &inode);
-	dir_close (dir);
+		dir_lookup (dir, name, &inode);	//디렉토리를 찾아서 name과 같은 파일이 있으면 inode open하고 그 정보를 inode에 담다.
+	dir_close (dir);	//디렉토리 닫기
 
-	return file_open (inode);
+	return file_open (inode);	//파일 열어서 반환 파일이 저장된 메모리 주소 반환
 }
 
 /* Deletes the file named NAME.

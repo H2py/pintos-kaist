@@ -77,7 +77,9 @@ sema_down (struct semaphore *sema) {
 	ASSERT (!intr_context ());
 
 	old_level = intr_disable ();
+   
 	while (sema->value == 0) { // sema->value == 0이면, wait_list에 넣음
+      thread_current()->wait_on_sema = sema;
 		list_insert_ordered(&sema->waiters, &thread_current()->elem, priority_first, NULL);
 		thread_block ();
 	}
@@ -127,14 +129,18 @@ sema_up (struct semaphore *sema) {
 	ASSERT (sema != NULL);
 
 	old_level = intr_disable ();
+
 	if (!list_empty (&sema->waiters)) {
       list_sort(&sema->waiters, priority_first, NULL);
       thread_unblock (list_entry (list_pop_front (&sema->waiters), struct thread, elem));
+
    }
 	sema->value++;
-   yield_to_higher_priority();
+   if(!intr_context())
+      yield_to_higher_priority();
 	intr_set_level (old_level);
 }
+
 
 
 
@@ -143,6 +149,7 @@ should_donation(int target_priority){
    return thread_current()->priority > target_priority;
 }
 
+static void sema_test_helper (void *sema_);
 /* Self-test for semaphores that makes control "ping-pong"
    between a pair of threads.  Insert calls to printf() to see
    what's going on. */
@@ -232,9 +239,18 @@ lock_acquire (struct lock *lock) {
 
       if(lock->holder->priority < cur->priority)
       {
+         enum intr_level old_level = intr_disable();
          list_insert_ordered(&lock->holder->donor_list, &cur->d_elem, priority_first, NULL);
          priority_donation();
+         intr_set_level(old_level);
       }
+
+      // if(lock->holder->status == THREAD_BLOCKED){
+      //    struct semaphore * target_sema = lock->holder->wait_on_sema;
+      //    if(target_sema->value == 0)
+      //       sema_up(target_sema);
+      //       // thread_unblock(lock->holder);
+      // }
    }
 
 	sema_down (&lock->semaphore);
@@ -302,6 +318,7 @@ void
 lock_release (struct lock *lock) {
 	ASSERT (lock != NULL);
 	ASSERT (lock_held_by_current_thread (lock));
+
    
    remove_donor(lock);   
 	lock->holder = NULL;

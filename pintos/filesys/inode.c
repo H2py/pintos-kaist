@@ -100,7 +100,7 @@ inode_create (disk_sector_t sector, off_t length) {
  * and returns a `struct inode' that contains it.
  * Returns a null pointer if memory allocation fails. */
 struct inode *
-inode_open (disk_sector_t sector) {
+inode_open (disk_sector_t sector) {	//디스크 섹터에서 읽어오기
 	struct list_elem *e;
 	struct inode *inode;
 

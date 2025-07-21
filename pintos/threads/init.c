@@ -83,7 +83,7 @@ main (void) {
 	console_init ();
 
 	/* Initialize memory system. */
-	mem_end = palloc_init ();
+	mem_end = palloc_init ();	//mem_end -> 20MB 우리가 정했던 메모리 크기
 	malloc_init ();
 	paging_init (mem_end);
 
@@ -280,7 +280,7 @@ run_actions (char **argv) {
 		const struct action *a;
 		int i;
 
-		/* Find action name. */
+		/* Find action name. */	//액션 테이블에서 정의된 것과 동일한 액션이 인자에 있는지 체크
 		for (a = actions; ; a++)
 			if (a->name == NULL)
 				PANIC ("unknown action `%s' (use -h for help)", *argv);
@@ -288,13 +288,13 @@ run_actions (char **argv) {
 				break;
 
 		/* Check for required arguments. */
-		for (i = 1; i < a->argc; i++)
+		for (i = 1; i < a->argc; i++)	//요구 인자를 만족하는지 체크
 			if (argv[i] == NULL)
 				PANIC ("action `%s' requires %d argument(s)", *argv, a->argc - 1);
 
 		/* Invoke action and advance. */
-		a->function (argv);
-		argv += a->argc;
+		a->function (argv);	//action 실행(함수)
+		argv += a->argc;	// 인자 개수 만큼 인자 배열 주소 증가(?)
 	}
 
 }
