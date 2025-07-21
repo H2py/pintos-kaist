@@ -198,9 +198,6 @@ process_exec (void *f_name) {
     // 4. 새로운 바이너리 로드
     success = load (file_name, &_if);
 
-	//hex_dump() 여기서 헥스 덤프로 스택 메모리 찍어보면 될듯
-	// hex_dump((int64_t)_if.rsp,_if.rsp,sizeof(_if.rsp),true);
-
     // 5. 실패 시 처리
     palloc_free_page (file_name);
     if (!success)
@@ -362,15 +359,12 @@ load (const char *file_name, struct intr_frame *if_) {
 	long int argc = 0;
 	int length;	//argument 문자열의 길이
 
-
-
 	/* Allocate and activate page directory. */
 	t->pml4 = pml4_create ();	//새로운 페이지 할당
 	if (t->pml4 == NULL)
 		goto done;
 	process_activate (thread_current ());	//새로운 스레드의 페이지 테이블 활성화
 
-	// 이전이랑 달라진 것은 없음
 	token = strtok_r(file_name," ",&save_ptr);
 
 	while(token != NULL){
@@ -378,7 +372,7 @@ load (const char *file_name, struct intr_frame *if_) {
 		token = strtok_r(NULL," ",&save_ptr);
 	}
 	
-	target_file = argv[0];	// FIX 파일명 포인터 변수 => File name
+	target_file = argv[0];	// 
 
 	/* Open executable file. */	// FIX 파일명만 자른 target_file로 변경해서 Read
 	file = filesys_open (target_file);	//디스크에서 실행 파일을 열어서 읽기 준비
@@ -477,31 +471,24 @@ load (const char *file_name, struct intr_frame *if_) {
 
 	if_->rsp -= sizeof(char*);	//null 삽입
 	
-	/* TODO : 배열에 있는 argument 주소를 반복문 돌려서 argc 만큼 스택에 넣어주기	-> 문제가 발생함
-	TODO : 그 다음에 rdi, rsi에도 argc 값과 argv[0]의 스택 주소 넣어주기*/
-	// char * temp;
+
 	uintptr_t argv_p;
 	for(i = argc -1 ; i>=0; i--){	//argv 인자들 메모리 주소 넣기
-		if_->rsp -= sizeof(argv_addrs[i]);	// TODO 이 때 rsp는 0x4747FFE0 임
-		memcpy(if_->rsp,&argv_addrs[i],sizeof(char *));	// TODO 여기서 잘못된 메모리 참조 예외 발생!
+		if_->rsp -= sizeof(argv_addrs[i]);	
+		memcpy(if_->rsp,&argv_addrs[i],sizeof(char *));	
 		if(i == 0) argv_p = if_->rsp;
 	}
 
 	if_->rsp -= sizeof(char*);
-	// *(uintptr_t *)if_->rsp = (uintptr_t)argv_addrs[0];
 	memcpy(if_->rsp,&argv_p,sizeof(char*));	//argv 주소 넣기
 
 	if_->rsp -= sizeof(long int);
-	// *(uintptr_t *)if_->rsp = argc;
 	memcpy(if_->rsp, &argc, sizeof(long int));	//argc 넣기
 
-	if_->rsp -= sizeof(char *);//이렇게만 해도 되려나? 일단 return 주소로 0을 처리함
+	if_->rsp -= sizeof(char *); 	//argv 주소 넣기
 
-	// FIX 레지스터 값 넣어주는 부분.
 	if_->R.rsi = argv_addrs[0];
 	if_->R.rdi = argc;
-	
-	hex_dump(if_->rsp,if_->rsp,USER_STACK - if_->rsp,true);
 
 	intr_set_level(old_level);
 
