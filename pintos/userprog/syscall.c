@@ -36,11 +36,96 @@ syscall_init (void) {
 	write_msr(MSR_SYSCALL_MASK,
 			FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
 }
+// /*
+// 	SYS_HALT,                   /* Halt the operating system. */
+// 	SYS_EXIT,                   /* Terminate this process. */
+// 	SYS_FORK,                   /* Clone current process. */
+// 	SYS_EXEC,                   /* Switch current process. */
+// 	SYS_WAIT,                   /* Wait for a child process to die. */
+// 	SYS_CREATE,                 /* Create a file. */
+// 	SYS_REMOVE,                 /* Delete a file. */
+// 	SYS_OPEN,                   /* Open a file. */
+// 	SYS_FILESIZE,               /* Obtain a file's size. */
+// 	SYS_READ,                   /* Read from a file. */
+// 	SYS_WRITE,                  /* Write to a file. */
+// 	SYS_SEEK,                   /* Change position in a file. */
+// 	SYS_TELL,                   /* Report current position in a file. */
+// 	SYS_CLOSE,                  /* Close a file. */
+
+// 	/* Project 3 and optionally project 4. */
+// 	SYS_MMAP,                   /* Map a file into memory. */
+// 	SYS_MUNMAP,                 /* Remove a memory mapping. */
+
+// 	/* Project 4 only. */
+// 	SYS_CHDIR,                  /* Change the current directory. */
+// 	SYS_MKDIR,                  /* Create a directory. */
+// 	SYS_READDIR,                /* Reads a directory entry. */
+// 	SYS_ISDIR,                  /* Tests if a fd represents a directory. */
+// 	SYS_INUMBER,                /* Returns the inode number for a fd. */
+// 	SYS_SYMLINK,                /* Returns the inode number for a fd. */
+
+// 	/* Extra for Project 2 */
+// 	SYS_DUP2,                   /* Duplicate the file descriptor */
+
+// 	SYS_MOUNT,
+// 	SYS_UMOUNT,
 
 /* The main system call interface */
 void
 syscall_handler (struct intr_frame *f UNUSED) {
 	// TODO: Your implementation goes here.
+	uint64_t sys_no = f->R.rax;
+	switch(sys_no){
+		case SYS_HALT:
+			printf("dd");
+			break;
+		case SYS_EXIT:
+			printf("dd");
+			break;
+		case SYS_FORK:
+			printf("dd");
+			break;	
+		case SYS_EXEC:
+			printf("dd");
+			break;	
+		case SYS_WAIT:
+			printf("dd");
+			break;	
+		case SYS_CREATE:
+			printf("dd");
+			break;	
+		case SYS_REMOVE:
+			printf("dd");
+			break;	
+		case SYS_OPEN:
+			printf("dd");
+			break;	
+		case SYS_FILESIZE:
+			printf("dd");
+			break;	
+		case SYS_READ:
+			printf("dd");
+			break;	
+		case SYS_WRITE:
+			printf("dd");
+			break;	
+		case SYS_SEEK:
+			printf("dd");
+			break;	
+		case SYS_TELL:
+			printf("dd");
+			break;	
+		case SYS_CLOSE:
+			printf("dd");
+			break;	
+			//projec 3
+		case SYS_MMAP:
+			printf("dd");
+			break;	
+		case SYS_MUNMAP:
+			printf("dd");
+			break;	
+	}
 	printf ("system call!\n");
 	thread_exit ();
 }
