@@ -35,6 +35,9 @@
 static bool sem_priority_first (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
 static void priority_donation(void);
 static void remove_donor(struct lock *lock);
+static void sema_test_helper (void *sema_);
+static bool should_donation(int priority);
+
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
    manipulating it:
@@ -126,11 +129,11 @@ sema_up (struct semaphore *sema) {
 	ASSERT (sema != NULL);
 
 	old_level = intr_disable ();
-	if (!list_empty (&sema->waiters)){
 
-      list_sort(&sema->waiters,priority_first,NULL);
-		thread_unblock (list_entry (list_pop_front (&sema->waiters),
-          struct thread, elem));
+	if (!list_empty (&sema->waiters)) {
+      list_sort(&sema->waiters, priority_first, NULL);
+      thread_unblock (list_entry (list_pop_front (&sema->waiters), struct thread, elem));
+
    }
 	sema->value++;
    if(!intr_context())
@@ -138,21 +141,12 @@ sema_up (struct semaphore *sema) {
 	intr_set_level (old_level);
 }
 
-void
-sema_up_no_yield (struct semaphore *sema) {
-	enum intr_level old_level;
 
-	ASSERT (sema != NULL);
 
-	old_level = intr_disable ();
-	if (!list_empty (&sema->waiters)){
 
-      list_sort(&sema->waiters,priority_first,NULL);
-		thread_unblock (list_entry (list_pop_front (&sema->waiters),
-          struct thread, elem));
-   }
-	sema->value++;
-	intr_set_level (old_level);
+static bool
+should_donation(int target_priority){
+   return thread_current()->priority > target_priority;
 }
 
 static void sema_test_helper (void *sema_);
@@ -260,7 +254,7 @@ lock_acquire (struct lock *lock) {
    }
 
 	sema_down (&lock->semaphore);
-	lock->holder = thread_current ();
+	lock->holder = cur;
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -306,6 +300,7 @@ remove_donor(struct lock *lock)
    for(e = list_begin(&cur->donor_list); e != list_end(&cur->donor_list);)
    {
       struct thread *t = list_entry(e, struct thread, d_elem);
+
       if (t->wait_on_lock == lock)
          e = list_remove(&t->d_elem);
       else
@@ -324,10 +319,11 @@ lock_release (struct lock *lock) {
 	ASSERT (lock != NULL);
 	ASSERT (lock_held_by_current_thread (lock));
 
+   
+   remove_donor(lock);   
 	lock->holder = NULL;
 	sema_up (&lock->semaphore);
 
-   remove_donor(lock);   
    refresh_priority();
    yield_to_higher_priority();
 }
