@@ -9,6 +9,8 @@
 #include "intrinsic.h"
 #include <syscall.h>
 #include <sys/types.h>
+#include <file.h>
+#include <console.h>
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -76,18 +78,21 @@ syscall_init (void) {
 void
 syscall_handler (struct intr_frame *f UNUSED) {
 	uint64_t sys_no = f->R.rax;
+
 	switch(sys_no){
 		case SYS_HALT:
 			halt();
 			break;
 		case SYS_EXIT:
-			exit();			// status 숫자를 뭘 넣어줘야 하는거지?
+			int status = f->R.rdi;
+			exit(status);			// status 숫자를 뭘 넣어줘야 하는거지?
 			break;
 		case SYS_FORK:
 			printf("dd");
 			break;	
 		case SYS_EXEC:
-			printf("dd");
+			const char* cmd = f->R.rdi;
+			exec(cmd);
 			break;	
 		case SYS_WAIT:
 			printf("dd");
@@ -105,10 +110,16 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			printf("dd");
 			break;	
 		case SYS_READ:
-			printf("dd");
+			int fd = f->R.rdi;
+			void *buffer = f->R.rsi;
+			int size = f->R.rdx;
+			read(fd, buffer, size);
 			break;	
 		case SYS_WRITE:
-			printf("dd");
+			int fd = f->R.rdi;
+			void *buffer = f->R.rsi;
+			int size = f->R.rdx;
+			write(fd, buffer, size);
 			break;	
 		case SYS_SEEK:
 			printf("dd");
@@ -174,11 +185,64 @@ int read(int fd, void *buffer, unsigned size)
 	if(fd < 0 || fd > 63)
 		return -1;
 	
+	struct thread *cur = thread_current();
+	struct file *file = cur->fdt[fd];		/* 읽어 올 file 가져오기 */
+	
+	if(file == NULL)
+		return -1; 
+
+	if(fd == 0) {							/* stdin에서 읽어옴 */
+		for (int i=0; i < size; i++)
+			((uint8_t *)buffer)[i] = input_getc(); 
+		return size;
+
+	} else {
+		int bytes_read = file_read(file, buffer, size);
+	
+		if(bytes_read < 0)
+			return -1; // error
+		else if(bytes_read == 0)
+			return 0; 
+		return bytes_read;
+	}
 }
 
 int write(int fd, const void *buffer, unsigned size)
 {
+	if(fd < 0 || fd > 63)
+		return -1;
 
+	struct thread *cur = thread_current();
+	struct file *file = cur->fdt[fd];
+	if(file == NULL)
+		return -1; 
+	
+	if(fd == 1) {
+		putbuf(buffer, size);
+		return size;
+	} else {
+		int byte_write = file_write(file, buffer, size);
+
+		if(byte_write < 0)
+			return -1;
+		else if (byte_write == 0)
+			return 0;
+		return byte_write;		
+	}
+}
+
+int close(int fd)
+{
+	if(fd < 0 || fd > 63)
+		return -1;
+
+	struct thread *cur = thread_current();
+	if(cur->fdt[fd] == NULL)
+		return -1; 
+
+	file_close(cur->fdt[fd]);
+	cur->fdt[fd] = NULL;
+	return 0; 
 }
 
 
