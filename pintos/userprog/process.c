@@ -359,7 +359,7 @@ load (const char *file_name, struct intr_frame *if_) {
 	char * target_file;
 	char * save_ptr = NULL;
 	char * token = NULL;
-	int argc = 0;
+	long int argc = 0;
 	int length;	//argument 문자열의 길이
 
 
@@ -473,8 +473,6 @@ load (const char *file_name, struct intr_frame *if_) {
 		memcpy(if_->rsp, argv[i],(sizeof(char) * length));	// TODO argv[i]에 NULL이 포함되는지 봐야됨
 	}
 
-	hex_dump(if_->rsp,if_->rsp,USER_STACK - if_->rsp,true);	// FIX NULL 아주 잘 들어가고 있음
-
 	if_->rsp -= if_->rsp % 8;	//padding
 
 	if_->rsp -= sizeof(char*);	//null 삽입
@@ -482,21 +480,20 @@ load (const char *file_name, struct intr_frame *if_) {
 	/* TODO : 배열에 있는 argument 주소를 반복문 돌려서 argc 만큼 스택에 넣어주기	-> 문제가 발생함
 	TODO : 그 다음에 rdi, rsi에도 argc 값과 argv[0]의 스택 주소 넣어주기*/
 	// char * temp;
+	uintptr_t argv_p;
 	for(i = argc -1 ; i>=0; i--){	//argv 인자들 메모리 주소 넣기
 		if_->rsp -= sizeof(argv_addrs[i]);	// TODO 이 때 rsp는 0x4747FFE0 임
-		// TODO 여기서 rsp는 0x4747FFD7
-
-		// *(uintptr_t *)if_->rsp = (uintptr_t)argv_addrs[i];
 		memcpy(if_->rsp,&argv_addrs[i],sizeof(char *));	// TODO 여기서 잘못된 메모리 참조 예외 발생!
+		if(i == 0) argv_p = if_->rsp;
 	}
 
 	if_->rsp -= sizeof(char*);
 	// *(uintptr_t *)if_->rsp = (uintptr_t)argv_addrs[0];
-	memcpy(if_->rsp,&argv_addrs[0],sizeof(char*));	//argv 주소 넣기
+	memcpy(if_->rsp,&argv_p,sizeof(char*));	//argv 주소 넣기
 
-	if_->rsp -= sizeof(int);
+	if_->rsp -= sizeof(long int);
 	// *(uintptr_t *)if_->rsp = argc;
-	memcpy(if_->rsp, &argc, sizeof(int));	//argc 넣기
+	memcpy(if_->rsp, &argc, sizeof(long int));	//argc 넣기
 
 	if_->rsp -= sizeof(char *);//이렇게만 해도 되려나? 일단 return 주소로 0을 처리함
 
@@ -507,11 +504,6 @@ load (const char *file_name, struct intr_frame *if_) {
 	hex_dump(if_->rsp,if_->rsp,USER_STACK - if_->rsp,true);
 
 	intr_set_level(old_level);
-	/* TODO: Your code goes here.
-		TODO: file_name const 풀기 -> 변경해야됨
-		TODO: file_name = strtok_r(file_name," ",&save_ptr)
-		TODO: 
-	 * TODO: Implement argument passing (see project2/argument_passing.html). */
 
 	success = true;
 
