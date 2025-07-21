@@ -95,7 +95,10 @@ struct thread {
 
 	int origin_priority;
 	struct lock * wait_on_lock;
+	
+	struct semaphore * wait_on_sema;
 	struct list donor_list;
+	struct list_elem d_elem;
 
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */

@@ -229,7 +229,7 @@ strtok_r (char *s, const char *delimiters, char **save_ptr) {
 	ASSERT (s != NULL);
 
 	/* Skip any DELIMITERS at our current position. */
-	while (strchr (delimiters, *s) != NULL) {
+	while (strchr (delimiters, *s) != NULL) {	//문자열 *s 내에서 delimiters가 있는 주소를 반환함
 		/* strchr() will always return nonnull if we're searching
 		   for a null byte, because every string contains a null
 		   byte (at the end). */

@@ -79,6 +79,7 @@ kill (struct intr_frame *f) {
 
 	/* The interrupt frame's code segment value tells us where the
 	   exception originated. */
+	   //인터럽트 프레임의 cs 정보에 예외 이벤트 발생 원인이 저장되어 있다.
 	switch (f->cs) {
 		case SEL_UCSEG:
 			/* User's code segment, so it's a user exception, as we

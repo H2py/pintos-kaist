@@ -68,7 +68,7 @@ tss_get (void) {
 /* Sets the ring 0 stack pointer in the TSS to point to the end
  * of the thread stack. */
 void
-tss_update (struct thread *next) {
-	ASSERT (tss != NULL);
-	tss->rsp0 = (uint64_t) next + PGSIZE;
+tss_update (struct thread *next) {	//TSS (Task State Segment) : 커널이 사용자 모드에서 커널 모드로 전환될 때(예: 인터럽트, 시스템 콜 발생 시) 필요한 스택 정보를 저장하는 데 사용
+		ASSERT (tss != NULL);
+	tss->rsp0 = (uint64_t) next + PGSIZE;	//
 }

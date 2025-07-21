@@ -520,7 +520,7 @@ interrupt_handler (struct intr_frame *f) {
 		if (f->vec_no == c->irq) {
 			if (c->expecting_interrupt) {
 				inb (reg_status (c));               /* Acknowledge interrupt. */
-				sema_up (&c->completion_wait);      /* Wake up waiter. */
+				sema_up(&c->completion_wait);      /* Wake up waiter. */
 			} else
 				printf ("%s: unexpected interrupt\n", c->name);
 			return;

@@ -331,8 +331,8 @@ thread_yield (void) {
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) {
-	thread_current ()->priority = new_priority;
-	// refresh_priority();
+	thread_current ()->origin_priority = new_priority;
+	refresh_priority();
 	yield_to_higher_priority();
 }
 
@@ -458,6 +458,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 	/* Initialize the thread's original priority for donation. */
 
 	t->origin_priority = priority;
+	t->wait_on_sema = NULL;
 	t->wait_on_lock = NULL;
 	list_init(&t->donor_list);
 

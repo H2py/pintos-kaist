@@ -31,6 +31,14 @@ static void __do_fork (void *);
 static void
 process_init (void) {
 	struct thread *current = thread_current ();
+	// 향후 추가될 수 있는 초기화 작업들:
+    // 1. 프로세스별 데이터 구조 초기화
+    // 2. 시그널 핸들러 설정
+    // 3. 환경 변수 설정
+    // 4. 파일 디스크립터 테이블 초기화
+    // 5. 프로세스별 설정 로드
+    // 6. 보안 컨텍스트 초기화
+    // 7. 프로세스별 통계 초기화
 }
 
 /* Starts the first userland program, called "initd", loaded from FILE_NAME.
@@ -42,18 +50,32 @@ tid_t
 process_create_initd (const char *file_name) {
 	char *fn_copy;
 	tid_t tid;
+	char * file_token;	// FIX file_token 변수 : 스레드 생성 시 스레드명을 파일명으로 동일하게 넣어주기 위한 token 변수
+	char * save_ptr;
 
 	/* Make a copy of FILE_NAME.
 	 * Otherwise there's a race between the caller and load(). */
-	fn_copy = palloc_get_page (0);
+	
+	fn_copy = palloc_get_page (0);	// 실행 파일을 위한 메모리 생성 (memset)
+	// TODO 근데 또 메모리 생성은 fn_copy로 받았어. 분명 문제가 있을듯.
+	
 	if (fn_copy == NULL)
 		return TID_ERROR;
-	strlcpy (fn_copy, file_name, PGSIZE);
+	strlcpy (fn_copy, file_name, PGSIZE);	//page size - 1(=4KB) 만큼 문자 복사 후 dest 끝에 \n 문자 자동으로 붙임. flie_name -> fn_copy 
+	// FIX file_token 변수에 "파일명"만 잘라서 넣음
+	// TODO 이렇게 한 이유는 strtok_r 쓰면 fn_copy에도 영향이 가서 파일명이 잘린 뒤부터 주소를 가리키고 있음.
+
+	file_token = strtok_r(file_name," ",&save_ptr);	// TODO fn_copy를 잘라도 되는걸지 모르겠음 -> 왜냐면 나중에 할당된 메모리 해제해야 할텐데 주소가 바뀌잖슴~~~ 
+
+	// FIX 일단 fn_copy 대신 file_token으로 바꿔서 해보는중
+	// TODO 여기서 strlcpy를 한 번 더 쓰긴 했는데 이게 문제가 될 수도..?
+	// FIX 일단 save_ptr에 원본 file_name 전체(파일명 + 인자)를 넣어서 initd 인자로 넣어줌
+	// strlcpy (save_ptr, file_name, PGSIZE);	//page size - 1(=4KB) 만큼 문자 복사 후 dest 끝에 \n 문자 자동으로 붙임. flie_name -> fn_copy 
 
 	/* Create a new thread to execute FILE_NAME. */
-	tid = thread_create (file_name, PRI_DEFAULT, initd, fn_copy);
+	tid = thread_create (file_token, PRI_DEFAULT, initd, fn_copy);	//새 스레드를 생성하면서 initd 스레드 함수 실행 인자로는 파일의 복사본을(fn_copy) 전달함
 	if (tid == TID_ERROR)
-		palloc_free_page (fn_copy);
+		palloc_free_page (fn_copy);	// TODO 왜냐면 메모리 해제도 fn_copy로 하걸랑.
 	return tid;
 }
 
@@ -64,9 +86,9 @@ initd (void *f_name) {
 	supplemental_page_table_init (&thread_current ()->spt);
 #endif
 
-	process_init ();
+	process_init ();	//process init을 왜 해주지?
 
-	if (process_exec (f_name) < 0)
+	if (process_exec (f_name) < 0)	
 		PANIC("Fail to launch initd\n");
 	NOT_REACHED ();
 }
@@ -158,38 +180,36 @@ error:
 	thread_exit ();
 }
 
-/* Switch the current execution context to the f_name.
- * Returns -1 on fail. */
 int
 process_exec (void *f_name) {
-	char *file_name = f_name;
-	bool success;
+    // 1. 파일명 설정
+    char *file_name = f_name;
+    bool success;
 
-	/* We cannot use the intr_frame in the thread structure.
-	 * This is because when current thread rescheduled,
-	 * it stores the execution information to the member. */
-	struct intr_frame _if;
-	_if.ds = _if.es = _if.ss = SEL_UDSEG;
-	_if.cs = SEL_UCSEG;
-	_if.eflags = FLAG_IF | FLAG_MBS;
+    // 2. 새로운 인터럽트 프레임 준비
+    struct intr_frame _if;
+    _if.ds = _if.es = _if.ss = SEL_UDSEG;  // 사용자 데이터 세그먼트
+    _if.cs = SEL_UCSEG;                    // 사용자 코드 세그먼트
+    _if.eflags = FLAG_IF | FLAG_MBS;       // 인터럽트 활성화 + 기본 플래그
 
-	/* We first kill the current context */
-	process_cleanup ();
+    // 3. 현재 컨텍스트 정리
+    process_cleanup ();
 
-	/* And then load the binary */
-	success = load (file_name, &_if);
+    // 4. 새로운 바이너리 로드
+    success = load (file_name, &_if);
 
-	/* If load failed, quit. */
-	palloc_free_page (file_name);
-	if (!success)
-		return -1;
+	//hex_dump() 여기서 헥스 덤프로 스택 메모리 찍어보면 될듯
+	hex_dump((int64_t)_if.rsp,_if.rsp,sizeof(_if.rsp),true);
 
-	/* Start switched process. */
-	do_iret (&_if);
-	NOT_REACHED ();
+    // 5. 실패 시 처리
+    palloc_free_page (file_name);
+    if (!success)
+        return -1;
+
+    // 6. 새로운 프로세스 시작
+    do_iret (&_if);
+    NOT_REACHED ();
 }
-
-
 /* Waits for thread TID to die and returns its exit status.  If
  * it was terminated by the kernel (i.e. killed due to an
  * exception), returns -1.  If TID is invalid or if it was not a
@@ -201,6 +221,8 @@ process_exec (void *f_name) {
  * does nothing. */
 int
 process_wait (tid_t child_tid UNUSED) {
+	while(1){
+	}
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
@@ -221,7 +243,7 @@ process_exit (void) {
 
 /* Free the current process's resources. */
 static void
-process_cleanup (void) {
+process_cleanup (void) {	//현재 스레드를 위해 할당한 페이지를 해제
 	struct thread *curr = thread_current ();
 
 #ifdef VM
@@ -231,7 +253,7 @@ process_cleanup (void) {
 	uint64_t *pml4;
 	/* Destroy the current process's page directory and switch back
 	 * to the kernel-only page directory. */
-	pml4 = curr->pml4;
+	pml4 = curr->pml4;	
 	if (pml4 != NULL) {
 		/* Correct ordering here is crucial.  We must set
 		 * cur->pagedir to NULL before switching page directories,
@@ -249,7 +271,7 @@ process_cleanup (void) {
 /* Sets up the CPU for running user code in the nest thread.
  * This function is called on every context switch. */
 void
-process_activate (struct thread *next) {
+process_activate (struct thread *next) {	//왜 next일까? -> // 현재 스레드에서 다음 스레드로 전환 process_activate(next);  "다음" 스레드를 활성화
 	/* Activate thread's page tables. */
 	pml4_activate (next->pml4);
 
@@ -322,6 +344,10 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
  * Returns true if successful, false otherwise. */
 static bool
 load (const char *file_name, struct intr_frame *if_) {
+	// FIX 고정 크기 매개변수 배열 생성 
+	static char *argv_addrs[LOADER_ARGS_LEN / 2 + 1];
+	static char *argv[LOADER_ARGS_LEN / 2 + 1];
+
 	struct thread *t = thread_current ();
 	struct ELF ehdr;
 	struct file *file = NULL;
@@ -329,41 +355,61 @@ load (const char *file_name, struct intr_frame *if_) {
 	bool success = false;
 	int i;
 
+	// FIX 파일명 / strtok_r 함수용 포인터 변수 2개 생성
+	char * target_file;
+	char * save_ptr = NULL;
+	char * token = NULL;
+	int argc = 0;
+	int length;	//argument 문자열의 길이
+
+
+
 	/* Allocate and activate page directory. */
-	t->pml4 = pml4_create ();
+	t->pml4 = pml4_create ();	//새로운 페이지 할당
 	if (t->pml4 == NULL)
 		goto done;
-	process_activate (thread_current ());
+	process_activate (thread_current ());	//새로운 스레드의 페이지 테이블 활성화
 
-	/* Open executable file. */
-	file = filesys_open (file_name);
+	// 이전이랑 달라진 것은 없음
+	token = strtok_r(file_name," ",&save_ptr);
+
+	while(token != NULL){
+		argv[argc++] = token;
+		token = strtok_r(NULL," ",&save_ptr);
+	}
+	
+	target_file = argv[0];	// FIX 파일명 포인터 변수 => File name
+
+	/* Open executable file. */	// FIX 파일명만 자른 target_file로 변경해서 Read
+	file = filesys_open (target_file);	//디스크에서 실행 파일을 열어서 읽기 준비
 	if (file == NULL) {
-		printf ("load: %s: open failed\n", file_name);
+		printf ("load: %s: open failed\n", target_file);
 		goto done;
 	}
 
 	/* Read and verify executable header. */
+	//읽고, ELF 헤더 검증
 	if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
-			|| memcmp (ehdr.e_ident, "\177ELF\2\1\1", 7)
-			|| ehdr.e_type != 2
-			|| ehdr.e_machine != 0x3E // amd64
-			|| ehdr.e_version != 1
-			|| ehdr.e_phentsize != sizeof (struct Phdr)
-			|| ehdr.e_phnum > 1024) {
+			|| memcmp (ehdr.e_ident, "\177ELF\2\1\1", 7)	//ELF 매직 넘버 확인
+			|| ehdr.e_type != 2								//실행 파일 타입
+			|| ehdr.e_machine != 0x3E // amd64 아키텍처인지
+			|| ehdr.e_version != 1		// ELF 버전 확인
+			|| ehdr.e_phentsize != sizeof (struct Phdr)	//프로그램 헤더 크기
+			|| ehdr.e_phnum > 1024) {	//프로그램 헤더 개수 제한
 		printf ("load: %s: error loading executable\n", file_name);
 		goto done;
 	}
 
 	/* Read program headers. */
-	file_ofs = ehdr.e_phoff;
+	file_ofs = ehdr.e_phoff;	//프로그램 헤더 오프셋
 	for (i = 0; i < ehdr.e_phnum; i++) {
 		struct Phdr phdr;
 
 		if (file_ofs < 0 || file_ofs > file_length (file))
 			goto done;
-		file_seek (file, file_ofs);
+		file_seek (file, file_ofs);	//프로그램 헤더 읽기 위해 오프셋 만큼 파일 포인터 이동
 
-		if (file_read (file, &phdr, sizeof phdr) != sizeof phdr)
+		if (file_read (file, &phdr, sizeof phdr) != sizeof phdr)	// 프로그램 헤더 읽기 
 			goto done;
 		file_ofs += sizeof phdr;
 		switch (phdr.p_type) {
@@ -414,7 +460,42 @@ load (const char *file_name, struct intr_frame *if_) {
 	/* Start address. */
 	if_->rip = ehdr.e_entry;
 
+	//argc는 마지막 null 개수까지 포함하고 있다.
+	// TODO 여기서 Argc 계산이 틀렸을 수도 있음. 인덱싱 계산 확인도 해보면 좋을듯!
+	for(i = argc - 1; i >= 0; i--){	//스택에 파싱한 인자 값 저장
+		length = strlen(argv[i]) + 1; 	// FIX NULL 문자 전까지만 들어가고 있었음,,, NULL까지 들어가야됨
+		if_->rsp -= length;
+		argv_addrs[i] = if_->rsp;
+		memcpy(if_->rsp, argv[i],(sizeof(char) * length));	// TODO argv[i]에 NULL이 포함되는지 봐야됨
+	}
+
+	hex_dump(if_->rsp,argv[0],sizeof(argv),true);	// FIX NULL 아주 잘 들어가고 있음
+
+	if_->rsp -= if_->rsp % 8;	//padding
+
+	if_->rsp -= sizeof(char*);	//null 삽입
+	
+	/* TODO : 배열에 있는 argument 주소를 반복문 돌려서 argc 만큼 스택에 넣어주기	-> 문제가 발생함
+	TODO : 그 다음에 rdi, rsi에도 argc 값과 argv[0]의 스택 주소 넣어주기*/
+	for(i = argc -1 ; i>=0; i--){	//argv 인자들 메모리 주소 넣기
+		if_->rsp -= sizeof(argv_addrs[i]);	// TODO 이 때 rsp는 0x4747FFE0 임
+		// TODO 여기서 rsp는 0x4747FFD7
+		// debug_backtrace();
+		memcpy(if_->rsp,argv_addrs[i],sizeof(argv_addrs[i]));	// TODO 여기서 잘못된 메모리 참조 예외 발생!
+	}
+
+	if_->rsp -= sizeof(char**);
+	memcpy(&if_->rsp,argv_addrs[0],sizeof(char**));	//argv 주소 넣기
+
+	if_->rsp -= sizeof(int);
+	memcpy(if_->rsp, argc, sizeof(int));	//argc 넣기
+
+	if_->rsp -= sizeof(char *);//이렇게만 해도 되려나? 일단 return 주소로 0을 처리함
+
 	/* TODO: Your code goes here.
+		TODO: file_name const 풀기 -> 변경해야됨
+		TODO: file_name = strtok_r(file_name," ",&save_ptr)
+		TODO: 
 	 * TODO: Implement argument passing (see project2/argument_passing.html). */
 
 	success = true;
@@ -540,11 +621,11 @@ setup_stack (struct intr_frame *if_) {
 	uint8_t *kpage;
 	bool success = false;
 
-	kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+	kpage = palloc_get_page (PAL_USER | PAL_ZERO);	//물리 메모리에서 4KB 페이지 할당 0으로 초기화
 	if (kpage != NULL) {
-		success = install_page (((uint8_t *) USER_STACK) - PGSIZE, kpage, true);
-		if (success)
-			if_->rsp = USER_STACK;
+		success = install_page (((uint8_t *) USER_STACK) - PGSIZE, kpage, true);	//USER_STACK 주소에서 - 페이지 크기 => 스택의 맨 아래 페이지 주소(스택은 밑으로 성장하니까)
+		if (success)			//kpage에 가상 주소 USER_SATCK - PGSIZE <-> 물리주소 매핑
+			if_->rsp = USER_STACK;	//페이지 할당되면, rsp(스택 포인터)가 USER_STACK 주소를 가리킴
 		else
 			palloc_free_page (kpage);
 	}

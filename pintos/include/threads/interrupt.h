@@ -23,15 +23,15 @@ struct gp_registers {
 	uint64_t r12;
 	uint64_t r11;
 	uint64_t r10;
-	uint64_t r9;
-	uint64_t r8;
-	uint64_t rsi;
-	uint64_t rdi;
-	uint64_t rbp;
-	uint64_t rdx;
-	uint64_t rcx;
-	uint64_t rbx;
-	uint64_t rax;
+	uint64_t r9;	//	6번째
+	uint64_t r8;	//	5번째
+	uint64_t rsi;	//	TODO 2번째 노션에는 argv[0] 주소 전달이라고 되어있음
+	uint64_t rdi;	//	TODO 1번째 노션에는 argc 넣는다고 되어있음
+	uint64_t rbp;	//스택 프레임 주소
+	uint64_t rdx;	//	3번째
+	uint64_t rcx;	//	4번째	또는 (syscall 함수에서는 리턴 주소)
+	uint64_t rbx;	
+	uint64_t rax;	//리턴 값 반환할 때 쓰는 레지스터
 } __attribute__((packed));
 // __attribute__((packed))의 의미 구조체의 padding 동작을 없애라는 것
 
