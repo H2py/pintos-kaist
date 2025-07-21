@@ -7,6 +7,8 @@
 #include "userprog/gdt.h"
 #include "threads/flags.h"
 #include "intrinsic.h"
+#include <syscall.h>
+#include <sys/types.h>
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -73,14 +75,13 @@ syscall_init (void) {
 /* The main system call interface */
 void
 syscall_handler (struct intr_frame *f UNUSED) {
-	// TODO: Your implementation goes here.
 	uint64_t sys_no = f->R.rax;
 	switch(sys_no){
 		case SYS_HALT:
-			printf("dd");
+			halt();
 			break;
 		case SYS_EXIT:
-			printf("dd");
+			exit();			// status 숫자를 뭘 넣어줘야 하는거지?
 			break;
 		case SYS_FORK:
 			printf("dd");
@@ -128,4 +129,65 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	}
 	printf ("system call!\n");
 	thread_exit ();
+}
+
+void halt(void)
+{
+	power_off();
+}
+
+void exit(int status)
+{
+	struct thread* cur = thread_current();
+	cur->status = status;
+	printf("Name of process: exit(%s).", get_by_status(status));
+	thread_exit();
+}
+
+/* Create child process and execute program correspond to cmd_line on it*/
+pid_t exec(const char *cmd_line)
+{
+	pid_t pid = fork();
+
+	if (pid < 0) {
+		perror("fork failed");
+		return -1;
+	}
+	else if (pid == 0) {
+		// Child process
+		process_exec(cmd_line);
+	} else {
+		// TODO : Parent process가 필요한지는 아직 미지수, exec 실행 후, 그러나 parent는 pid로 식별 가능하도록 구현
+		return pid;
+	}
+}
+
+/* 자식 프로세스가 종료되기를 기다리고, 자식의 종료 상태를 반환*/
+int wait(pid_t pid)
+{
+
+}
+
+
+int read(int fd, void *buffer, unsigned size)
+{
+	if(fd < 0 || fd > 63)
+		return -1;
+	
+}
+
+int write(int fd, const void *buffer, unsigned size)
+{
+
+}
+
+
+static const char *get_by_status(enum thread_status status) {
+	switch (status) {
+		case THREAD_RUNNING: return "running";
+		case THREAD_READY: return "ready";
+		case THREAD_BLOCKED: return "blocked";
+		case THREAD_DYING: return "dying";
+		default: return "unknown";
+	}
 }
