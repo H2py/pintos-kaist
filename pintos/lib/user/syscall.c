@@ -1,6 +1,13 @@
 #include <syscall.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include "../syscall-nr.h"
+#include <sys/types.h>
+#include "userprog/syscall.h"
+// Define READDIR_MAX_LEN if not already defined
+#ifndef READDIR_MAX_LEN
+#define READDIR_MAX_LEN 14
+#endif
 
 __attribute__((always_inline))
 static __inline int64_t syscall (uint64_t num_, uint64_t a1_, uint64_t a2_,

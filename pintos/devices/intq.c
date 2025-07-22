@@ -44,7 +44,7 @@ intq_getc (struct intq *q) {
 		lock_release (&q->lock);
 	}
 
-	byte = q->buf[q->tail];
+	byte = q->buf[q->tail]; 
 	q->tail = next (q->tail);
 	signal (q, &q->not_full);
 	return byte;

@@ -79,7 +79,6 @@ sema_down (struct semaphore *sema) {
 	old_level = intr_disable ();
    
 	while (sema->value == 0) { // sema->value == 0이면, wait_list에 넣음
-      thread_current()->wait_on_sema = sema;
 		list_insert_ordered(&sema->waiters, &thread_current()->elem, priority_first, NULL);
 		thread_block ();
 	}
@@ -245,12 +244,6 @@ lock_acquire (struct lock *lock) {
          intr_set_level(old_level);
       }
 
-      // if(lock->holder->status == THREAD_BLOCKED){
-      //    struct semaphore * target_sema = lock->holder->wait_on_sema;
-      //    if(target_sema->value == 0)
-      //       sema_up(target_sema);
-      //       // thread_unblock(lock->holder);
-      // }
    }
 
 	sema_down (&lock->semaphore);

@@ -57,25 +57,17 @@ process_create_initd (const char *file_name) {
 	 * Otherwise there's a race between the caller and load(). */
 	
 	fn_copy = palloc_get_page (0);	// 실행 파일을 위한 메모리 생성 (memset)
-	// TODO 근데 또 메모리 생성은 fn_copy로 받았어. 분명 문제가 있을듯.
 	
 	if (fn_copy == NULL)
 		return TID_ERROR;
 	strlcpy (fn_copy, file_name, PGSIZE);	//page size - 1(=4KB) 만큼 문자 복사 후 dest 끝에 \n 문자 자동으로 붙임. flie_name -> fn_copy 
-	// FIX file_token 변수에 "파일명"만 잘라서 넣음
-	// TODO 이렇게 한 이유는 strtok_r 쓰면 fn_copy에도 영향이 가서 파일명이 잘린 뒤부터 주소를 가리키고 있음.
 
-	file_token = strtok_r(file_name," ",&save_ptr);	// TODO fn_copy를 잘라도 되는걸지 모르겠음 -> 왜냐면 나중에 할당된 메모리 해제해야 할텐데 주소가 바뀌잖슴~~~ 
-
-	// FIX 일단 fn_copy 대신 file_token으로 바꿔서 해보는중
-	// TODO 여기서 strlcpy를 한 번 더 쓰긴 했는데 이게 문제가 될 수도..?
-	// FIX 일단 save_ptr에 원본 file_name 전체(파일명 + 인자)를 넣어서 initd 인자로 넣어줌
-	// strlcpy (save_ptr, file_name, PGSIZE);	//page size - 1(=4KB) 만큼 문자 복사 후 dest 끝에 \n 문자 자동으로 붙임. flie_name -> fn_copy 
+	file_token = strtok_r(file_name," ",&save_ptr);
 
 	/* Create a new thread to execute FILE_NAME. */
-	tid = thread_create (file_token, PRI_DEFAULT, initd, fn_copy);	//새 스레드를 생성하면서 initd 스레드 함수 실행 인자로는 파일의 복사본을(fn_copy) 전달함
+	tid = thread_create (file_token, PRI_DEFAULT, initd, fn_copy);	
 	if (tid == TID_ERROR)
-		palloc_free_page (fn_copy);	// TODO 왜냐면 메모리 해제도 fn_copy로 하걸랑.
+		palloc_free_page (fn_copy);	
 	return tid;
 }
 
@@ -86,7 +78,7 @@ initd (void *f_name) {
 	supplemental_page_table_init (&thread_current ()->spt);
 #endif
 
-	process_init ();	//process init을 왜 해주지?
+	process_init ();	
 
 	if (process_exec (f_name) < 0)	
 		PANIC("Fail to launch initd\n");

@@ -92,7 +92,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			break;	
 		case SYS_EXEC:
 			const char* cmd = f->R.rdi;
-			exec(cmd);
+			f->R.rax = exec(cmd);
 			break;	
 		case SYS_WAIT:
 			printf("dd");
@@ -113,13 +113,13 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			int fd = f->R.rdi;
 			void *buffer = f->R.rsi;
 			int size = f->R.rdx;
-			read(fd, buffer, size);
+			f->R.rax = read(fd, buffer, size);
 			break;	
 		case SYS_WRITE:
 			int fd = f->R.rdi;
 			void *buffer = f->R.rsi;
 			int size = f->R.rdx;
-			write(fd, buffer, size);
+			f->R.rax = write(fd, buffer, size);
 			break;	
 		case SYS_SEEK:
 			printf("dd");
@@ -150,8 +150,7 @@ void halt(void)
 void exit(int status)
 {
 	struct thread* cur = thread_current();
-	cur->status = status;
-	printf("Name of process: exit(%s).", get_by_status(status));
+	printf("Process %s : exit(%d).", cur->name, status);
 	thread_exit();
 }
 
@@ -167,15 +166,25 @@ pid_t exec(const char *cmd_line)
 	else if (pid == 0) {
 		// Child process
 		process_exec(cmd_line);
-	} else {
-		// TODO : Parent process가 필요한지는 아직 미지수, exec 실행 후, 그러나 parent는 pid로 식별 가능하도록 구현
-		return pid;
 	}
 }
 
 /* 자식 프로세스가 종료되기를 기다리고, 자식의 종료 상태를 반환*/
 int wait(pid_t pid)
 {
+	struct thread *curr = thread_current();
+	struct list_elem *e;
+	struct thread *target;
+	for (e = list_begin(&curr->child_list); e != list_end(&curr->child_list); e = list_next(e))
+	{
+		target = list_entry(e, struct thread, c_elem);
+		if ((pid == target->tid) && target->status == THREAD_RUNNING) {
+			while(target->status != THREAD_RUNNING) {
+				
+			}
+		}
+	}
+	
 
 }
 
@@ -195,12 +204,11 @@ int read(int fd, void *buffer, unsigned size)
 		for (int i=0; i < size; i++)
 			((uint8_t *)buffer)[i] = input_getc(); 
 		return size;
-
 	} else {
 		int bytes_read = file_read(file, buffer, size);
 	
 		if(bytes_read < 0)
-			return -1; // error
+			return -1; 
 		else if(bytes_read == 0)
 			return 0; 
 		return bytes_read;
@@ -221,7 +229,7 @@ int write(int fd, const void *buffer, unsigned size)
 		putbuf(buffer, size);
 		return size;
 	} else {
-		int byte_write = file_write(file, buffer, size);
+		int byte_write = file_write(file, buffer, size); // If error occurs use the int32_t
 
 		if(byte_write < 0)
 			return -1;
@@ -231,6 +239,7 @@ int write(int fd, const void *buffer, unsigned size)
 	}
 }
 
+/* Fix */
 int close(int fd)
 {
 	if(fd < 0 || fd > 63)
@@ -239,19 +248,13 @@ int close(int fd)
 	struct thread *cur = thread_current();
 	if(cur->fdt[fd] == NULL)
 		return -1; 
-
+ 
 	file_close(cur->fdt[fd]);
 	cur->fdt[fd] = NULL;
+
+	if(fd == cur->next_fd - 1)
+		cur->next_fd--;
+
 	return 0; 
 }
 
-
-static const char *get_by_status(enum thread_status status) {
-	switch (status) {
-		case THREAD_RUNNING: return "running";
-		case THREAD_READY: return "ready";
-		case THREAD_BLOCKED: return "blocked";
-		case THREAD_DYING: return "dying";
-		default: return "unknown";
-	}
-}
