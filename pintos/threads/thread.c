@@ -206,6 +206,9 @@ thread_create (const char *name, int priority,
 	init_thread (t, name, priority);
 	tid = t->tid = allocate_tid ();
 
+	//부모 - 자식 매핑
+	thread_current()->child = t;
+	
 	/* Call the kernel_thread if it scheduled.
 	 * Note) rdi is 1st argument, and rsi is 2nd argument. */
 	t->tf.rip = (uintptr_t) kernel_thread;
@@ -479,6 +482,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->next_fd = 0; // 다음 파일 디스크립터 번호를 2로 초기화
 
 	t->parent = NULL;
+	t->child = NULL;
 	list_init(&t->child_list);
 	sema_init(&t->wait_sema, 0);
 	t->is_waited = false;

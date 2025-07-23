@@ -106,6 +106,8 @@ struct thread {
 	struct list child_list;
 	struct list_elem c_elem;
 
+	struct thread * child;
+
 	int exit_status; 					/* child process의 exit_status*/
 	
 	struct semaphore wait_sema; 		/* 부모 대기, 자식이 신호 보내는 세마포어*/
