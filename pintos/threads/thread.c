@@ -299,12 +299,15 @@ thread_exit (void) {
 	ASSERT (!intr_context ());
 	struct thread *curr = thread_current ();
 	/* Close all open file descriptors. */
-	for(int fd = 3; fd < 64; fd++)
-	{
-		close(curr->fdt[fd]);
-		curr->fdt[fd] = NULL;
-	}
-	curr->next_fd = 3;
+
+	// for(int fd = 3; fd < 64; fd++)
+	// {
+	// 	close(curr->fdt[fd]);
+	// 	curr->fdt[fd] = NULL;
+	// }
+
+	// curr->next_fd = 3;
+
 
 #ifdef USERPROG
 	process_exit ();
@@ -468,19 +471,17 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->wait_on_lock = NULL;
 	list_init(&t->donor_list);
 
-	/* 1. 파일 디스크립터 테이블 할당 및 포인터 초기화 2. fd0, fd1은 stdin과 stdout 용으로 생성*/
-	t->fdt[0] = stdin; // fd 0
-	t->fdt[1] = stdout; // fd 1
-	t->fdt[2] = stderr; // fd 2
 
-	for (int i = 3; i < 64; i ++)
+
+	for (int i = 0; i < 64; i ++)
 		t->fdt[i] = NULL;
 
-	t->next_fd = 3; // 다음 파일 디스크립터 번호를 2로 초기화
+	t->next_fd = 0; // 다음 파일 디스크립터 번호를 2로 초기화
 
 	t->parent = NULL;
 	list_init(&t->child_list);
 	sema_init(&t->wait_sema, 0);
+	t->is_waited = false;
 	t->exit_status = -1; // child process의 exit_status를 -1로 초기화
 }
 

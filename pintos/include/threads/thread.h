@@ -4,6 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include "threads/synch.h"
 #include "threads/interrupt.h"
 #ifdef VM
 #include "vm/vm.h"
@@ -98,7 +99,6 @@ struct thread {
 	
 	struct list donor_list;
 	struct list_elem d_elem;
-										// TODO : fdt 구조체 선언에 대한 고민 **fdt or *fdt[64];
 	struct file *fdt[64];         		/* file descriptor table을 배열 포인터로 선언, 사용할 때는 투 포인터를 사용한다*/
 	int next_fd;                        /* 다음 파일 디스크립터 번호를 저장한다. next_fd = 3, 새로 open한 파일에 fd=3 배정하고 next_fd++를 사용하여 다음부터 4 사용하게 함*/
 
@@ -107,8 +107,9 @@ struct thread {
 	struct list_elem c_elem;
 
 	int exit_status; 					/* child process의 exit_status*/
+	
 	struct semaphore wait_sema; 		/* 부모 대기, 자식이 신호 보내는 세마포어*/
-
+	bool is_waited;
 
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
