@@ -163,7 +163,10 @@ __do_fork (void *aux) {
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
 
+
 	process_init ();
+	// TODO : child_list 작동 확인
+	list_insert(list_tail(&parent->child_list),&current->elem);
 
 	/* Finally, switch to the newly created process. */
 	if (succ)
@@ -210,13 +213,33 @@ process_exec (void *f_name) {
  * does nothing. */
 int
 process_wait (tid_t child_tid UNUSED) {
-
+	struct list_elem *e;
+	struct thread * child;
 	struct thread * parent = thread_current();
-	struct semaphore * sema = &parent->wait_sema;
-	// sema_down(sema);
-	thread_sleep(100);	
+
+	// for (e = list_begin(&parent->child_list); e != list_end(&parent->child_list); e = list_next(e))
+	// {
+	// 	child = list_entry(e, struct thread, c_elem);
+	// 	if (child_tid == child->tid) {
+	// 		if(child->is_waited){
+	// 			printf("이미 기다리고 있는 자식 프로세스임.\n");
+	// 			return -1;
+	// 		}
+	// 		if(child->status == THREAD_DYING){
+	// 			return child->exit_status;
+	// 		}
+	// 		else{
+	// 			child->is_waited = true;
+	// 		}
+	// 	}
+	// }
+	if(parent->child != NULL && parent->child->tid == child_tid){
+		sema_down(&parent->child->wait_sema);
+	}
+	//struct semaphore * sema = &child->wait_sema;
+	// sema_down(&parent->wait_sema);
 	
-	return -1;
+	return parent->child->exit_status;
 }
 
 /* Exit the process. This function is called by thread_exit (). */
@@ -224,7 +247,7 @@ void
 process_exit (void) {
 	struct thread *curr = thread_current ();
 	if(curr->pml4 != NULL){
-		printf("%s : exit(%d)\n", curr->name, curr->exit_status);
+		printf("%s: exit(%d)\n", curr->name, curr->exit_status);
 	}
 	sema_up(&curr->wait_sema);
 
@@ -367,7 +390,7 @@ load (const char *file_name, struct intr_frame *if_) {
 	
 	target_file = argv[0];	// 
 
-	/* Open executable file. */	// FIX 파일명만 자른 target_file로 변경해서 Read
+	/* Open executable file. */
 	file = filesys_open (target_file);	//디스크에서 실행 파일을 열어서 읽기 준비
 	if (file == NULL) {
 		printf ("load: %s: open failed\n", target_file);
@@ -449,17 +472,12 @@ load (const char *file_name, struct intr_frame *if_) {
 
 	enum intr_level old_level = intr_disable();
 	//argc는 마지막 null 개수까지 포함하고 있다.
-	// TODO 여기서 Argc 계산이 틀렸을 수도 있음. 인덱싱 계산 확인도 해보면 좋을듯!
 	for(i = argc - 1; i >= 0; i--){	//스택에 파싱한 인자 값 저장
-		length = strlen(argv[i]) + 1; 	// FIX NULL 문자 전까지만 들어가고 있었음,,, NULL까지 들어가야됨
+		length = strlen(argv[i]) + 1; 	
 
 		if_->rsp -= length;
-		printf("argc : %d\n",argc);
-		printf("argv %p\n",argv);
-		printf("%s : ",argv[i]);
-		printf("%p\n",if_->rsp);
 		argv_addrs[i] = if_->rsp;
-		memcpy(if_->rsp, argv[i],(sizeof(char) * length));	// TODO argv[i]에 NULL이 포함되는지 봐야됨
+		memcpy(if_->rsp, argv[i],(sizeof(char) * length));
 	}
 
 	if_->rsp -= if_->rsp % 8;	//padding
@@ -481,7 +499,7 @@ load (const char *file_name, struct intr_frame *if_) {
 
 	if_->rsp -= sizeof(char *); 	//argv 주소 넣기
 
-	if_->R.rsi = argv_addrs[0];
+	if_->R.rsi = argv_p;
 	if_->R.rdi = argc;
 
 	intr_set_level(old_level);

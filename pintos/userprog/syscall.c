@@ -53,7 +53,6 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			halt();
 			break;
 		case SYS_EXIT:
-			printf("\n%d\n",f->R.rdi);	// TODO : userprogram에서 Exit으로 안 들어옴.
 			exit(f->R.rdi);			// status 숫자를 뭘 넣어줘야 하는거지?
 			break;
 		case SYS_FORK:
@@ -100,7 +99,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			printf("dd");
 			break;	
 	}
-	thread_exit ();
+	// thread_exit ();
 }
 
 void halt(void)
@@ -111,7 +110,6 @@ void halt(void)
 void exit(int status)
 {
 	struct thread* cur = thread_current();
-	printf("%d -> first status\n",status);
 	cur->exit_status = status;	//exit_status 와 thread의 Status는 다르다.
 	thread_exit();
 }
@@ -197,13 +195,14 @@ int read(int fd, void *buffer, unsigned size)
 
 int write(int fd, const void *buffer, unsigned size)
 {
+
 	if(fd < 0 || fd > 63){
 		printf("%d is not right fd value\n",fd);
 		return -1;
 
 	}
 
-	struct thread *cur = thread_current();
+	//struct thread *cur = thread_current();
 	// struct file *file = cur->fdt[fd];
 	// if(file == NULL)
 	// 	return -1; 
@@ -249,5 +248,4 @@ static bool is_valid_pointer(void * ptr){
 	if(!is_user_vaddr(ptr)) return false;
 	// mapping 된 메모리 영역을 가리키는지 확인하는 함수가 필요함
 	return true;
-
 }
