@@ -9,5 +9,8 @@ tid_t exec(const char *cmd_line);
 int wait(tid_t pid);
 int read(int fd, void *buffer, unsigned size);
 int write(int fd, const void *buffer, unsigned size);
+tid_t fork (const char *thread_name);
+
+// struct lock filesys_lock;
 
 #endif /* userprog/syscall.h */

@@ -303,13 +303,16 @@ thread_exit (void) {
 	struct thread *curr = thread_current ();
 	/* Close all open file descriptors. */
 
-	// for(int fd = 3; fd < 64; fd++)
-	// {
-	// 	close(curr->fdt[fd]);
-	// 	curr->fdt[fd] = NULL;
-	// }
+	for(int fd = 3; fd < 64; fd++)
+	{
+		if(curr->fdt[fd] != NULL) {
+			close(fd);
+			curr->fdt[fd] = NULL;
+		}
+	}
 
-	// curr->next_fd = 3;
+	curr->next_fd = 3;
+	curr->max_fd = 3;
 
 
 #ifdef USERPROG
@@ -474,15 +477,15 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->wait_on_lock = NULL;
 	list_init(&t->donor_list);
 
-
-
 	for (int i = 0; i < 64; i ++)
 		t->fdt[i] = NULL;
 
-	t->next_fd = 0; // 다음 파일 디스크립터 번호를 2로 초기화
+	t->next_fd = 3; // 다음 파일 디스크립터 번호를 3으로 초기화
+	t->max_fd = 3;
 
 	t->parent = NULL;
 	t->child = NULL;
+
 	list_init(&t->child_list);
 	sema_init(&t->wait_sema, 0);
 	t->is_waited = false;

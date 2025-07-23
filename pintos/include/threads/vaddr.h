@@ -7,6 +7,17 @@
 
 #include "threads/loader.h"
 
+/*
+63          48 47            39 38            30 29            21 20         12 11         0
++-------------+----------------+----------------+----------------+-------------+------------+
+| Sign Extend |    Page-Map    | Page-Directory | Page-directory |  Page-Table |  Physical  |
+|             | Level-4 Offset |    Pointer     |     Offset     |   Offset    |   Offset   |
++-------------+----------------+----------------+----------------+-------------+------------+
+              |                |                |                |             |            |
+              +------- 9 ------+------- 9 ------+------- 9 ------+----- 9 -----+---- 12 ----+
+                                          Virtual Address
+*/
+
 /* Functions and macros for working with virtual addresses.
  *
  * See pte.h for functions and macros specifically for x86
