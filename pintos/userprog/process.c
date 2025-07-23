@@ -89,9 +89,17 @@ initd (void *f_name) {
  * TID_ERROR if the thread cannot be created. */
 tid_t
 process_fork (const char *name, struct intr_frame *if_ UNUSED) {
+	tid_t child_tid;
+
+	
 	/* Clone current thread to new thread.*/
-	return thread_create (name,
+	printf("Dobe is free\n");
+	child_tid = thread_create (name,
 			PRI_DEFAULT, __do_fork, thread_current ());
+	sema_down(&thread_current()->wait_sema);
+	printf("Dobe is locked\n");
+	if_->R.rax = child_tid;
+	return if_->R.rax;
 }
 
 #ifndef VM
@@ -113,22 +121,22 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 
 	/* 3. TODO: Allocate new PAL_USER page for the child and set result to NEWPAGE */
 	newpage = palloc_get_page(PAL_USER);
+	if(newpage == NULL)
+		return false;
 
 	/* 4. TODO: Duplicate parent's page to the new page and
 	 *    TODO: check whether parent's page is writable or not (set WRITABLE
 	 *    TODO: according to the result). */
     
 	memcpy(newpage, parent_page, PGSIZE);
-	if(is_writable(pte))
-		writable = true;
-	else
-		writable = false;
-	
+	writable = is_writable(pte);
+
 	/* 5. Add new page to child's page table at address VA with WRITABLE
 	 *    permission. */
 	if (!pml4_set_page (current->pml4, va, newpage, writable)) {
 		/* 6. TODO: if fail to insert page, do error handling. */
 		palloc_free_page(newpage);
+		printf("Duplicate failed to at %p", va);
 		return false;
 	} 
 	return true;
@@ -150,6 +158,7 @@ __do_fork (void *aux) {
 
 	/* 1. Read the cpu context to local stack. */
 	memcpy (&if_, parent_if, sizeof (struct intr_frame));
+	if_.R.rax = 0;
 
 	/* 2. Duplicate PT */
 	current->pml4 = pml4_create();
@@ -172,9 +181,15 @@ __do_fork (void *aux) {
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
 
+	printf("Im your child\n");
+	for(int i =0; i < 63; i++)
+		current->fdt[i] = file_duplicate(&parent->fdt[i]);
+	sema_up(&parent->wait_sema);
 
+	printf("Free child\n");
 	process_init ();
-
+	// TODO : 변경사항 확인 필요, exit에서 child_list 수정 필요
+	list_push_back(&parent->child_list, &current->c_elem);
 	/* Finally, switch to the newly created process. */
 	if (succ)
 		do_iret (&if_);

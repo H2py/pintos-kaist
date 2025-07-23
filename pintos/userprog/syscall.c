@@ -32,7 +32,7 @@ static bool is_valid_pointer(void *);
 
 void
 syscall_init (void) {
-    lock_init(&filesys_lock);
+    // lock_init(&filesys_lock);
 	write_msr(MSR_STAR, ((uint64_t)SEL_UCSEG - 0x10) << 48  |
 			((uint64_t)SEL_KCSEG) << 32);
 	write_msr(MSR_LSTAR, (uint64_t) syscall_entry);
@@ -57,13 +57,13 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			exit(f->R.rdi);			// status 숫자를 뭘 넣어줘야 하는거지?
 			break;
 		case SYS_FORK:
-			printf("dd");
+			f->R.rax = fork(f->R.rdi);
 			break;	
 		case SYS_EXEC:
 			f->R.rax = exec(f->R.rdi);
 			break;	
 		case SYS_WAIT:
-			printf("dd");
+			f->R.rax = wait(f->R.rdi);
 			break;	
 		case SYS_CREATE:
 			printf("dd");
@@ -90,7 +90,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			printf("dd");
 			break;	
 		case SYS_CLOSE:
-			printf("dd");
+			close(f->R.rdi);
 			break;	
 			//projec 3
 		case SYS_MMAP:
@@ -117,8 +117,7 @@ void exit(int status)
 
 tid_t fork (const char *thread_name)
 {
-    struct thread *cur = thread_current();
-    process_fork(thread_name, &cur->tf);
+    return process_fork(thread_name, &thread_current()->tf);
 }
 
 
@@ -192,9 +191,9 @@ int read(int fd, void *buffer, unsigned size)
 		return size;
 	} 
 	else {
-        lock_acquire(&filesys_lock);
+        // lock_acquire(&filesys_lock);
 		int bytes_read = file_read(file, buffer, size);
-        lock_release(&filesys_lock);
+        // lock_release(&filesys_lock);
 	
 		if(bytes_read < 0)
 			return -1; 
@@ -215,17 +214,17 @@ int write(int fd, const void *buffer, unsigned size)
 	struct thread *cur = thread_current();
 	struct file *file = cur->fdt[fd];
 
-	if(file == NULL)
-		return -1; 
+	// if(file == NULL)
+	// 	return -1; 
 	
     if(fd == 1) {
 		putbuf(buffer, size);
 		return size;
 	}
     else {
-        lock_acquire(&filesys_lock);
+        // lock_acquire(&filesys_lock);
         int byte_write = file_write(file, buffer, size); // If error occurs use the int32_t
-        lock_release(&filesys_lock);
+        // lock_release(&filesys_lock);
 
         if(byte_write < 0) return -1;
         else if (byte_write == 0) return 0;
@@ -246,9 +245,9 @@ int close(int fd)
 	if(cur->fdt[fd] == NULL)
 		return -1; 
     
-    lock_acquire(&filesys_lock);
+    // lock_acquire(&filesys_lock);
 	file_close(cur->fdt[fd]);
-    lock_release(&filesys_lock);
+    // lock_release(&filesys_lock);
 	cur->fdt[fd] = NULL;
 
 	if(fd == cur->next_fd - 1)
