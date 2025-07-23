@@ -174,8 +174,6 @@ __do_fork (void *aux) {
 
 
 	process_init ();
-	// TODO : child_list 작동 확인
-	list_insert(list_tail(&parent->child_list),&current->elem);
 
 	/* Finally, switch to the newly created process. */
 	if (succ)
