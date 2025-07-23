@@ -32,6 +32,7 @@ static bool is_valid_pointer(void *);
 
 void
 syscall_init (void) {
+    lock_init(&filesys_lock);
 	write_msr(MSR_STAR, ((uint64_t)SEL_UCSEG - 0x10) << 48  |
 			((uint64_t)SEL_KCSEG) << 32);
 	write_msr(MSR_LSTAR, (uint64_t) syscall_entry);
@@ -114,19 +115,26 @@ void exit(int status)
 	thread_exit();
 }
 
+tid_t fork (const char *thread_name)
+{
+    struct thread *cur = thread_current();
+    process_fork(thread_name, &cur->tf);
+}
+
+
 /* Create child process and execute program correspond to cmd_line on it*/
 tid_t exec(const char *cmd_line)
 {
-	// tid_t pid = fork();
+	tid_t pid = fork(cmd_line);
 
-	// if (pid < 0) {
-	// 	printf("fork failed");
-	// 	return -1;
-	// }
-	// else if (pid == 0) {
-	// 	// Child process
-	// 	process_exec(cmd_line);
-	// }
+	if (pid < 0) {
+		printf("fork failed");
+		return -1;
+	}
+	else if (pid == 0) {
+		// Child process
+		process_exec(cmd_line);
+	}
 }
 
 /* 자식 프로세스가 종료되기를 기다리고, 자식의 종료 상태를 반환*/
@@ -166,6 +174,7 @@ int wait(tid_t pid)
 
 int read(int fd, void *buffer, unsigned size)
 {
+    
 	if(fd < 0 || fd > 63)
 		return -1;
 	
@@ -183,7 +192,9 @@ int read(int fd, void *buffer, unsigned size)
 		return size;
 	} 
 	else {
+        lock_acquire(&filesys_lock);
 		int bytes_read = file_read(file, buffer, size);
+        lock_release(&filesys_lock);
 	
 		if(bytes_read < 0)
 			return -1; 
@@ -199,28 +210,30 @@ int write(int fd, const void *buffer, unsigned size)
 	if(fd < 0 || fd > 63){
 		printf("%d is not right fd value\n",fd);
 		return -1;
-
 	}
 
-	//struct thread *cur = thread_current();
-	// struct file *file = cur->fdt[fd];
-	// if(file == NULL)
-	// 	return -1; 
-	if(fd == 1) {
+	struct thread *cur = thread_current();
+	struct file *file = cur->fdt[fd];
+
+	if(file == NULL)
+		return -1; 
+	
+    if(fd == 1) {
 		putbuf(buffer, size);
 		return size;
 	}
-	printf("not yet file descriptors \n");
-	return -1;
-	// } else {
-	// 	int byte_write = file_write(file, buffer, size); // If error occurs use the int32_t
+    else {
+        lock_acquire(&filesys_lock);
+        int byte_write = file_write(file, buffer, size); // If error occurs use the int32_t
+        lock_release(&filesys_lock);
 
-	// 	if(byte_write < 0)
-	// 		return -1;
-	// 	else if (byte_write == 0)
-	// 		return 0;
-	// 	return byte_write;		
-	// }
+        if(byte_write < 0) return -1;
+        else if (byte_write == 0) return 0;
+        return byte_write;		
+    }
+    
+    printf("not yet file descriptors \n");
+    return -1;
 }
 
 /* Fix */
@@ -232,8 +245,10 @@ int close(int fd)
 	struct thread *cur = thread_current();
 	if(cur->fdt[fd] == NULL)
 		return -1; 
- 
+    
+    lock_acquire(&filesys_lock);
 	file_close(cur->fdt[fd]);
+    lock_release(&filesys_lock);
 	cur->fdt[fd] = NULL;
 
 	if(fd == cur->next_fd - 1)

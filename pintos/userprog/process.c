@@ -106,22 +106,31 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 	bool writable;
 
 	/* 1. TODO: If the parent_page is kernel page, then return immediately. */
+	if(is_kern_pte(pte)) return false;
 
 	/* 2. Resolve VA from the parent's page map level 4. */
-	parent_page = pml4_get_page (parent->pml4, va);
+	parent_page = pml4_get_page (parent->pml4, va); // parent의 pml4d에서 가상 메모리랑 대응되는 물리 주소를 가져온다
 
-	/* 3. TODO: Allocate new PAL_USER page for the child and set result to
-	 *    TODO: NEWPAGE. */
+	/* 3. TODO: Allocate new PAL_USER page for the child and set result to NEWPAGE */
+	newpage = palloc_get_page(PAL_USER);
 
 	/* 4. TODO: Duplicate parent's page to the new page and
 	 *    TODO: check whether parent's page is writable or not (set WRITABLE
 	 *    TODO: according to the result). */
-
+    
+	memcpy(newpage, parent_page, PGSIZE);
+	if(is_writable(pte))
+		writable = true;
+	else
+		writable = false;
+	
 	/* 5. Add new page to child's page table at address VA with WRITABLE
 	 *    permission. */
 	if (!pml4_set_page (current->pml4, va, newpage, writable)) {
 		/* 6. TODO: if fail to insert page, do error handling. */
-	}
+		palloc_free_page(newpage);
+		return false;
+	} 
 	return true;
 }
 #endif
@@ -136,7 +145,7 @@ __do_fork (void *aux) {
 	struct thread *parent = (struct thread *) aux;
 	struct thread *current = thread_current ();
 	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
-	struct intr_frame *parent_if;
+	struct intr_frame *parent_if = &parent->tf;
 	bool succ = true;
 
 	/* 1. Read the cpu context to local stack. */
