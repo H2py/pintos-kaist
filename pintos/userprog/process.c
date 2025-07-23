@@ -210,11 +210,12 @@ process_exec (void *f_name) {
  * does nothing. */
 int
 process_wait (tid_t child_tid UNUSED) {
-	while(1){
-	}
-	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
-	 * XXX:       to add infinite loop here before
-	 * XXX:       implementing the process_wait. */
+
+	struct thread * parent = thread_current();
+	struct semaphore * sema = &parent->wait_sema;
+	// sema_down(sema);
+	thread_sleep(100);	
+	
 	return -1;
 }
 
@@ -222,10 +223,10 @@ process_wait (tid_t child_tid UNUSED) {
 void
 process_exit (void) {
 	struct thread *curr = thread_current ();
-	/* TODO: Your code goes here.
-	 * TODO: Implement process termination message (see
-	 * TODO: project2/process_termination.html).
-	 * TODO: We recommend you to implement process resource cleanup here. */
+	if(curr->pml4 != NULL){
+		printf("%s : exit(%d)\n", curr->name, curr->exit_status);
+	}
+	sema_up(&curr->wait_sema);
 
 	process_cleanup ();
 }
@@ -453,6 +454,8 @@ load (const char *file_name, struct intr_frame *if_) {
 		length = strlen(argv[i]) + 1; 	// FIX NULL 문자 전까지만 들어가고 있었음,,, NULL까지 들어가야됨
 
 		if_->rsp -= length;
+		printf("argc : %d\n",argc);
+		printf("argv %p\n",argv);
 		printf("%s : ",argv[i]);
 		printf("%p\n",if_->rsp);
 		argv_addrs[i] = if_->rsp;
@@ -463,7 +466,6 @@ load (const char *file_name, struct intr_frame *if_) {
 
 	if_->rsp -= sizeof(char*);	//null 삽입
 	
-
 	uintptr_t argv_p;
 	for(i = argc -1 ; i>=0; i--){	//argv 인자들 메모리 주소 넣기
 		if_->rsp -= sizeof(argv_addrs[i]);	
