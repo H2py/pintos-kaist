@@ -14,7 +14,7 @@ unsigned tell (int fd);
 bool create(const char *file, unsigned initial_size);
 int open(const char *file);
 int filesize(int fd);
-int close(int fd);
+void close(int fd);
 bool remove(const char *file);
 struct file *get_file_by_fd(int fd);
 // struct lock filesys_lock;

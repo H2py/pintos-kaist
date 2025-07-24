@@ -27,7 +27,7 @@ rox-child FAIL
 alarm-single PASS
 read-normal FAIL
 priority-donate-multiple2 PASS
-open-empty FAIL
+open-empty PASS
 open-null PASS
 bad-write2 PASS
 multi-recurse FAIL
@@ -57,7 +57,7 @@ fork-once FAIL
 priority-change PASS
 write-boundary FAIL
 wait-killed FAIL
-close-bad-fd PASS
+close-bad-fd FAIL
 alarm-negative PASS
 multi-child-fd FAIL
 exit PASS
@@ -73,7 +73,7 @@ create-exists PASS
 open-normal PASS
 bad-jump PASS
 bad-jump2 PASS
-open-missing FAIL
+open-missing PASS
 create-empty PASS
 args-single PASS
 write-stdin PASS
