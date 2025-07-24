@@ -10,7 +10,13 @@ int wait(tid_t pid);
 int read(int fd, void *buffer, unsigned size);
 int write(int fd, const void *buffer, unsigned size);
 tid_t fork (const char *thread_name);
-
+unsigned tell (int fd);
+bool create(const char *file, unsigned initial_size);
+int open(const char *file);
+int filesize(int fd);
+int close(int fd);
+bool remove(const char *file);
+struct file *get_file_by_fd(int fd);
 // struct lock filesys_lock;
 
 #endif /* userprog/syscall.h */

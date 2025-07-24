@@ -110,27 +110,30 @@ void halt(void)
 
 bool create(const char *file, unsigned initial_size)
 {
-    if(file == NULL) return false;
+    if(file == NULL) exit(-1);
 
     return filesys_create(file, initial_size);
 }
 
 bool remove(const char *file)
 {
-    if (file == NULL) return false;
+    if (file == NULL) exit(-1);
 
     return filesys_remove(file);
 }
 
 int open(const char *file)
 {
-    if (file == NULL) return -1;
+    if (file == NULL) exit(-1);
 
     return filesys_open(file);
 }
 
 int filesize(int fd)
 {
+	if(get_file_by_fd(fd) == NULL){
+		
+	}
     return file_length(get_file_by_fd(fd));
 }
 
@@ -154,7 +157,7 @@ tid_t exec(const char *cmd_line)
 
 	if (pid < 0) {
 		printf("fork failed");
-		return -1;
+		exit(-1);
 	}
 	else if (pid == 0) {
 		// Child process
@@ -167,7 +170,7 @@ int wait(tid_t pid)
 {
 	if(pid < 0) {
 		printf("유효한 pid가 아님\n");
-		return -1;	//유효한 PID가 아님.
+		exit(-1);
 	}
 
 	struct thread *curr = thread_current();	//부모 프로세스
@@ -180,7 +183,7 @@ int wait(tid_t pid)
 		if (pid == target->tid) {
 			if(target->is_waited){
 				printf("이미 기다리고 있는 자식 프로세스임.\n");
-				return -1;
+				exit(-1);
 			}
 			if(target->status == THREAD_DYING){
 				return target->exit_status;
@@ -193,21 +196,20 @@ int wait(tid_t pid)
 	}
 
 	printf("해당 pid를 갖는 자식 프로세스를 찾지 못함.\n");
-	return -1;
-	
+	exit(-1);	
 }
 
 int read(int fd, void *buffer, unsigned size)
 {
     
 	if(fd < 0 || fd > 63)
-		return -1;
+		exit(-1);
 	
 	struct thread *cur = thread_current();
 	struct file *file = cur->fdt[fd];		/* 읽어 올 file 가져오기 */
 	
 	if(file == NULL)
-		return -1; 
+		exit(-1); 
 	// TODO : 읽기 권한이 있는지 체크
 	// TODO : Buffer의 크기와 size 간에 관계에 대한 조건을 체크해야 되는지 확인하기
 
@@ -222,7 +224,7 @@ int read(int fd, void *buffer, unsigned size)
         // lock_release(&filesys_lock);
 	
 		if(bytes_read < 0)
-			return -1; 
+			exit(-1); 
 		else if(bytes_read == 0)
 			return 0; 
 		return bytes_read;
@@ -234,31 +236,30 @@ int write(int fd, const void *buffer, unsigned size)
 
 	if(fd < 0 || fd > 63){
 		printf("%d is not right fd value\n",fd);
-		return -1;
+		exit(-1);
 	}
 
 	struct thread *cur = thread_current();
 	struct file *file = cur->fdt[fd];
 
-	if(file == NULL)
-		return -1; 
-	
+
     if(fd == 1) {
 		putbuf(buffer, size);
 		return size;
 	}
+	else if(file == NULL) exit(-1);
     else {
         lock_acquire(&filesys_lock);
         int byte_write = file_write(file, buffer, size); // If error occurs use the int32_t
         lock_release(&filesys_lock);
 
-        if(byte_write < 0) return -1;
+        if(byte_write < 0) exit(-1);
         else if (byte_write == 0) return 0;
         return byte_write;		
     }
     
     printf("not yet file descriptors \n");
-    return -1;
+    exit(-1);
 }
 
 /* Fix */
@@ -297,11 +298,11 @@ static bool is_valid_pointer(void * ptr){
 struct file *get_file_by_fd(int fd)
 {
     if(fd < 0 || fd > 63)
-        return -1;
+        return NULL;
     struct thread *cur = thread_current();
     
     if(cur->fdt[fd] == NULL)
-		return -1; 
+		return NULL; 
 
-    return (int)cur->fdt[fd];
+    return cur->fdt[fd];
 }
