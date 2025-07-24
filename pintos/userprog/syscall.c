@@ -7,12 +7,12 @@
 #include "userprog/gdt.h"
 #include "threads/flags.h"
 #include "intrinsic.h"
-#include "userprog/syscall.h"
 #include <console.h>
 #include "userprog/process.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
+static struct lock filesys_lock;
 
 /* System call.
  *
@@ -124,9 +124,33 @@ bool remove(const char *file)
 
 int open(const char *file)
 {
-    if (file == NULL) exit(-1);
+	int ret = -1;
+    struct thread *cur = thread_current();
 
-    return filesys_open(file);
+    if(!is_valid_pointer(file)){
+		cur->exit_status = -1;
+		return ret;
+	}
+    // lock_acquire(&filesys_lock);
+
+    struct file *f = filesys_open(file);
+    if(f == NULL){
+		cur->exit_status = -1;
+		return ret;
+	}
+
+    else {
+        for(int fd = 3; fd < 63; fd++) {
+            if(get_file_by_fd(fd) == NULL) {
+                cur->next_fd = fd;
+				ret = fd;
+				cur->fdt[cur->next_fd] = f;
+                break;
+            }
+        }
+    }
+	    // lock_release(&filesys_lock);
+    return ret;
 }
 
 int filesize(int fd)
@@ -249,9 +273,9 @@ int write(int fd, const void *buffer, unsigned size)
 	}
 	else if(file == NULL) exit(-1);
     else {
-        lock_acquire(&filesys_lock);
+        // lock_acquire(&filesys_lock);
         int byte_write = file_write(file, buffer, size); // If error occurs use the int32_t
-        lock_release(&filesys_lock);
+        // lock_release(&filesys_lock);
 
         if(byte_write < 0) exit(-1);
         else if (byte_write == 0) return 0;
@@ -263,18 +287,23 @@ int write(int fd, const void *buffer, unsigned size)
 }
 
 /* Fix */
-int close(int fd)
+void close(int fd)
 {    
     struct thread *cur = thread_current();
-    lock_acquire(&filesys_lock);
-	file_close(get_file_by_fd(fd));
-    lock_release(&filesys_lock);
+    // lock_acquire(&filesys_lock);
+	struct file * target;
+	
+	if((target = get_file_by_fd(fd)) == NULL){
+		cur->exit_status = -1;
+		return ;
+	}
+	file_close(target);
+    // lock_release(&filesys_lock);
 	cur->fdt[fd] = NULL;
 
 	if(fd == cur->next_fd - 1)
 		cur->next_fd--;
 
-	return 0; 
 }
 
 unsigned tell (int fd)

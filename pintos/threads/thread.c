@@ -303,16 +303,16 @@ thread_exit (void) {
 	struct thread *curr = thread_current ();
 	/* Close all open file descriptors. */
 
-	for(int fd = 3; fd < 64; fd++)
-	{
-		if(curr->fdt[fd] != NULL) {
-			close(fd);
-			curr->fdt[fd] = NULL;
-		}
-	}
+	// for(int fd = 3; fd < 64; fd++)
+	// {
+	// 	if(curr->fdt[fd] != NULL) {
+	// 		file_close(curr->fdt[fd]);
+	// 		curr->fdt[fd] = NULL;
+	// 	}
+	// }
 
-	curr->next_fd = 3;
-	curr->max_fd = 3;
+	// curr->next_fd = 3;
+	// curr->max_fd = 3;
 
 
 #ifdef USERPROG
@@ -489,7 +489,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 	list_init(&t->child_list);
 	sema_init(&t->wait_sema, 0);
 	t->is_waited = false;
-	t->exit_status = -1; // child process의 exit_status를 -1로 초기화
+	t->exit_status = 0; // exit_status 를 처음에 0으로 초기화
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
