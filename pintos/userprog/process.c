@@ -91,13 +91,11 @@ tid_t
 process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	tid_t child_tid;
 
-	
 	/* Clone current thread to new thread.*/
-	printf("Dobe is free\n");
 	child_tid = thread_create (name,
 			PRI_DEFAULT, __do_fork, thread_current ());
 	sema_down(&thread_current()->wait_sema);
-	printf("Dobe is locked\n");
+	
 	if_->R.rax = child_tid;
 	return if_->R.rax;
 }
@@ -181,12 +179,10 @@ __do_fork (void *aux) {
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
 
-	printf("Im your child\n");
 	for(int i =0; i < 63; i++)
 		current->fdt[i] = file_duplicate(&parent->fdt[i]);
 	sema_up(&parent->wait_sema);
 
-	printf("Free child\n");
 	process_init ();
 	// TODO : 변경사항 확인 필요, exit에서 child_list 수정 필요
 	list_push_back(&parent->child_list, &current->c_elem);

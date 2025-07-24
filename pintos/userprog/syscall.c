@@ -28,11 +28,11 @@ void syscall_handler (struct intr_frame *);
 #define MSR_SYSCALL_MASK 0xc0000084 /* Mask for the eflags */
 
 static bool is_valid_pointer(void *);
-
+static struct lock filesys_lock;
 
 void
 syscall_init (void) {
-    // lock_init(&filesys_lock);
+    lock_init(&filesys_lock);
 	write_msr(MSR_STAR, ((uint64_t)SEL_UCSEG - 0x10) << 48  |
 			((uint64_t)SEL_KCSEG) << 32);
 	write_msr(MSR_LSTAR, (uint64_t) syscall_entry);
@@ -66,16 +66,16 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			f->R.rax = wait(f->R.rdi);
 			break;	
 		case SYS_CREATE:
-			printf("dd");
+			f->R.rax = create(f->R.rdi, f->R.rsi);
 			break;	
 		case SYS_REMOVE:
-			printf("dd");
+			f->R.rax = remove(f->R.rdi);
 			break;	
 		case SYS_OPEN:
-			printf("dd");
+			f->R.rax = open(f->R.rdi);
 			break;	
 		case SYS_FILESIZE:
-			printf("dd");
+			f->R.rax = filesize(f->R.rdi);
 			break;	
 		case SYS_READ:
 			f->R.rax = read(f->R.rdi, f->R.rsi, f->R.rdx);
@@ -84,21 +84,21 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			f->R.rax = write(f->R.rdi, f->R.rsi, f->R.rdx);
 			break;	
 		case SYS_SEEK:
-			printf("dd");
+			seek(f->R.rdi, f->R.rsi);
 			break;	
 		case SYS_TELL:
-			printf("dd");
+			f->R.rax = tell(f->R.rdi);
 			break;	
 		case SYS_CLOSE:
 			close(f->R.rdi);
 			break;	
 			//projec 3
-		case SYS_MMAP:
-			printf("dd");
-			break;	
-		case SYS_MUNMAP:
-			printf("dd");
-			break;	
+		// case SYS_MMAP:
+		// 	printf("dd");
+		// 	break;	
+		// case SYS_MUNMAP:
+		// 	printf("dd");
+		// 	break;	
 	}
 	// thread_exit ();
 }
@@ -106,6 +106,32 @@ syscall_handler (struct intr_frame *f UNUSED) {
 void halt(void)
 {
 	power_off();
+}
+
+bool create(const char *file, unsigned initial_size)
+{
+    if(file == NULL) return false;
+
+    return filesys_create(file, initial_size);
+}
+
+bool remove(const char *file)
+{
+    if (file == NULL) return false;
+
+    return filesys_remove(file);
+}
+
+int open(const char *file)
+{
+    if (file == NULL) return -1;
+
+    return filesys_open(file);
+}
+
+int filesize(int fd)
+{
+    return file_length(get_file_by_fd(fd));
 }
 
 void exit(int status)
@@ -214,17 +240,17 @@ int write(int fd, const void *buffer, unsigned size)
 	struct thread *cur = thread_current();
 	struct file *file = cur->fdt[fd];
 
-	// if(file == NULL)
-	// 	return -1; 
+	if(file == NULL)
+		return -1; 
 	
     if(fd == 1) {
 		putbuf(buffer, size);
 		return size;
 	}
     else {
-        // lock_acquire(&filesys_lock);
+        lock_acquire(&filesys_lock);
         int byte_write = file_write(file, buffer, size); // If error occurs use the int32_t
-        // lock_release(&filesys_lock);
+        lock_release(&filesys_lock);
 
         if(byte_write < 0) return -1;
         else if (byte_write == 0) return 0;
@@ -237,17 +263,11 @@ int write(int fd, const void *buffer, unsigned size)
 
 /* Fix */
 int close(int fd)
-{
-	if(fd < 0 || fd > 63)
-		return -1;
-
-	struct thread *cur = thread_current();
-	if(cur->fdt[fd] == NULL)
-		return -1; 
-    
-    // lock_acquire(&filesys_lock);
-	file_close(cur->fdt[fd]);
-    // lock_release(&filesys_lock);
+{    
+    struct thread *cur = thread_current();
+    lock_acquire(&filesys_lock);
+	file_close(get_file_by_fd(fd));
+    lock_release(&filesys_lock);
 	cur->fdt[fd] = NULL;
 
 	if(fd == cur->next_fd - 1)
@@ -256,10 +276,32 @@ int close(int fd)
 	return 0; 
 }
 
+unsigned tell (int fd)
+{
+    return file_tell(get_file_by_fd(fd));
+}
+
+void seek(int fd, unsigned position)
+{
+    file_seek(get_file_by_fd(fd), position);
+}
 
 static bool is_valid_pointer(void * ptr){
 	if(ptr == NULL) return false;
-	if(!is_user_vaddr(ptr)) return false;
+	if(is_kernel_vaddr(ptr)) return false;
+    
 	// mapping 된 메모리 영역을 가리키는지 확인하는 함수가 필요함
 	return true;
+}
+
+struct file *get_file_by_fd(int fd)
+{
+    if(fd < 0 || fd > 63)
+        return -1;
+    struct thread *cur = thread_current();
+    
+    if(cur->fdt[fd] == NULL)
+		return -1; 
+
+    return (int)cur->fdt[fd];
 }
