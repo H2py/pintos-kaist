@@ -43,7 +43,7 @@ read-boundary FAIL
 priority-sema PASS
 wait-twice FAIL
 exec-boundary FAIL
-close-normal FAIL
+close-normal PASS
 halt PASS
 write-bad-fd FAIL
 alarm-zero PASS

@@ -7,6 +7,7 @@
 #include "userprog/gdt.h"
 #include "threads/flags.h"
 #include "intrinsic.h"
+#include "include/filesys/filesys.h"
 #include <console.h>
 #include "userprog/process.h"
 
@@ -138,7 +139,6 @@ int open(const char *file)
 		cur->exit_status = -1;
 		return ret;
 	}
-
     else {
         for(int fd = 3; fd < 63; fd++) {
             if(get_file_by_fd(fd) == NULL) {
@@ -149,7 +149,7 @@ int open(const char *file)
             }
         }
     }
-	    // lock_release(&filesys_lock);
+	// lock_release(&filesys_lock);
     return ret;
 }
 
@@ -303,7 +303,6 @@ void close(int fd)
 
 	if(fd == cur->next_fd - 1)
 		cur->next_fd--;
-
 }
 
 unsigned tell (int fd)
@@ -317,10 +316,11 @@ void seek(int fd, unsigned position)
 }
 
 static bool is_valid_pointer(void * ptr){
+	struct thread *cur = thread_current();
 	if(ptr == NULL) return false;
 	if(is_kernel_vaddr(ptr)) return false;
+	if(!pml4_get_page(cur->pml4, ptr)) return false; // 현재 프로세스의 페이지 테이블에서 ptr이 가리키는 페이지가 존재하는지 확인
     
-	// mapping 된 메모리 영역을 가리키는지 확인하는 함수가 필요함
 	return true;
 }
 
