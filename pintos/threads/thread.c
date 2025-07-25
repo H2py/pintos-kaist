@@ -303,17 +303,15 @@ thread_exit (void) {
 	struct thread *curr = thread_current ();
 	/* Close all open file descriptors. */
 
-	// for(int fd = 3; fd < 64; fd++)
-	// {
-	// 	if(curr->fdt[fd] != NULL) {
-	// 		file_close(curr->fdt[fd]);
-	// 		curr->fdt[fd] = NULL;
-	// 	}
-	// }
+	for(int fd = 3; fd < 64; fd++)
+	{
+		if(curr->fdt[fd] != NULL) {
+			file_close(curr->fdt[fd]);
+			curr->fdt[fd] = NULL;
+		}
+	}
 
-	// curr->next_fd = 3;
-	// curr->max_fd = 3;
-
+	curr->next_fd = 3;
 
 #ifdef USERPROG
 	process_exit ();

@@ -129,7 +129,7 @@ int open(const char *file)
     struct thread *cur = thread_current();
 
     if(!is_valid_pointer(file)){
-		cur->exit_status = -1;
+		exit(-1);
 		return ret;
 	}
     // lock_acquire(&filesys_lock);
@@ -193,7 +193,6 @@ tid_t exec(const char *cmd_line)
 int wait(tid_t pid)
 {
 	if(pid < 0) {
-		printf("유효한 pid가 아님\n");
 		exit(-1);
 	}
 
@@ -206,7 +205,6 @@ int wait(tid_t pid)
 		target = list_entry(e, struct thread, c_elem);
 		if (pid == target->tid) {
 			if(target->is_waited){
-				printf("이미 기다리고 있는 자식 프로세스임.\n");
 				exit(-1);
 			}
 			if(target->status == THREAD_DYING){
@@ -219,7 +217,6 @@ int wait(tid_t pid)
 		}
 	}
 
-	printf("해당 pid를 갖는 자식 프로세스를 찾지 못함.\n");
 	exit(-1);	
 }
 
@@ -258,32 +255,38 @@ int read(int fd, void *buffer, unsigned size)
 int write(int fd, const void *buffer, unsigned size)
 {
 
-	if(fd < 0 || fd > 63){
-		printf("%d is not right fd value\n",fd);
-		exit(-1);
-	}
-
 	struct thread *cur = thread_current();
 	struct file *file = cur->fdt[fd];
+
+
+	if(fd < 0 || fd > 63){
+		cur->exit_status = -1;
+		return -1;
+	}
 
 
     if(fd == 1) {
 		putbuf(buffer, size);
 		return size;
 	}
-	else if(file == NULL) exit(-1);
+	else if(file == NULL){
+		cur->exit_status = -1;
+		return -1;
+	} 
     else {
         // lock_acquire(&filesys_lock);
         int byte_write = file_write(file, buffer, size); // If error occurs use the int32_t
         // lock_release(&filesys_lock);
 
-        if(byte_write < 0) exit(-1);
+        if(byte_write < 0){
+			cur->exit_status = -1;
+			return -1;
+		} 
         else if (byte_write == 0) return 0;
         return byte_write;		
     }
     
-    printf("not yet file descriptors \n");
-    exit(-1);
+    return -1;
 }
 
 /* Fix */

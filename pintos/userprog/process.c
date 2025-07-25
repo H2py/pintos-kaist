@@ -94,10 +94,12 @@ process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	/* Clone current thread to new thread.*/
 	child_tid = thread_create (name,
 			PRI_DEFAULT, __do_fork, thread_current ());
+
 	sema_down(&thread_current()->wait_sema);
 	
-	if_->R.rax = child_tid;
-	return if_->R.rax;
+	//if_->R.rax = child_tid;
+
+	return child_tid;
 }
 
 #ifndef VM
@@ -156,6 +158,7 @@ __do_fork (void *aux) {
 
 	/* 1. Read the cpu context to local stack. */
 	memcpy (&if_, parent_if, sizeof (struct intr_frame));
+	
 	if_.R.rax = 0;
 
 	/* 2. Duplicate PT */
