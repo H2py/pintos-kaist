@@ -238,29 +238,23 @@ process_wait (tid_t child_tid UNUSED) {
 	struct thread * child;
 	struct thread * parent = thread_current();
 
-	// for (e = list_begin(&parent->child_list); e != list_end(&parent->child_list); e = list_next(e))
-	// {
-	// 	child = list_entry(e, struct thread, c_elem);
-	// 	if (child_tid == child->tid) {
-	// 		if(child->is_waited){
-	// 			printf("이미 기다리고 있는 자식 프로세스임.\n");
-	// 			return -1;
-	// 		}
-	// 		if(child->status == THREAD_DYING){
-	// 			return child->exit_status;
-	// 		}
-	// 		else{
-	// 			child->is_waited = true;
-	// 		}
-	// 	}
-	// }
-	if(parent->child != NULL && parent->child->tid == child_tid){
-		sema_down(&parent->child->wait_sema);
+	for (e = list_begin(&parent->child_list); e != list_end(&parent->child_list); e = list_next(e))
+	{
+		child = list_entry(e, struct thread, c_elem);
+		if (child && child_tid == child->tid) {
+			if(child->is_waited){
+				return -1;
+			} else {
+				if(child->status != THREAD_DYING){
+					child->is_waited = true;
+					sema_down(&child->wait_sema);
+					return child->exit_status;
+				} else 
+					return child->exit_status;
+			}
+		}
 	}
-	//struct semaphore * sema = &child->wait_sema;
-	// sema_down(&parent->wait_sema);
-	
-	return parent->child->exit_status;
+	return -1;
 }
 
 /* Exit the process. This function is called by thread_exit (). */

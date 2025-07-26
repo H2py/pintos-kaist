@@ -132,7 +132,6 @@ int open(const char *file)
 		exit(-1);
 		return ret;
 	}
-    // lock_acquire(&filesys_lock);
 
     struct file *f = filesys_open(file);
     if(f == NULL){
@@ -149,7 +148,6 @@ int open(const char *file)
             }
         }
     }
-	// lock_release(&filesys_lock);
     return ret;
 }
 
@@ -192,32 +190,10 @@ tid_t exec(const char *cmd_line)
 /* 자식 프로세스가 종료되기를 기다리고, 자식의 종료 상태를 반환*/
 int wait(tid_t pid)
 {
-	if(pid < 0) {
+	if(pid < 0)
 		exit(-1);
-	}
 
-	struct thread *curr = thread_current();	//부모 프로세스
-	struct list_elem *e;
-	struct thread *target;
-
-	for (e = list_begin(&curr->child_list); e != list_end(&curr->child_list); e = list_next(e))
-	{
-		target = list_entry(e, struct thread, c_elem);
-		if (pid == target->tid) {
-			if(target->is_waited){
-				exit(-1);
-			}
-			if(target->status == THREAD_DYING){
-				return target->exit_status;
-			}
-			else{
-				target->is_waited = true;
-				return process_wait(pid);
-			}
-		}
-	}
-
-	exit(-1);	
+	return process_wait(pid);
 }
 
 int read(int fd, void *buffer, unsigned size)
@@ -240,9 +216,7 @@ int read(int fd, void *buffer, unsigned size)
 		return size;
 	} 
 	else {
-        // lock_acquire(&filesys_lock);
 		int bytes_read = file_read(file, buffer, size);
-        // lock_release(&filesys_lock);
 	
 		if(bytes_read < 0)
 			exit(-1); 
@@ -274,9 +248,7 @@ int write(int fd, const void *buffer, unsigned size)
 		return -1;
 	} 
     else {
-        // lock_acquire(&filesys_lock);
         int byte_write = file_write(file, buffer, size); // If error occurs use the int32_t
-        // lock_release(&filesys_lock);
 
         if(byte_write < 0){
 			cur->exit_status = -1;
@@ -293,7 +265,6 @@ int write(int fd, const void *buffer, unsigned size)
 void close(int fd)
 {    
     struct thread *cur = thread_current();
-    // lock_acquire(&filesys_lock);
 	struct file * target;
 	
 	if((target = get_file_by_fd(fd)) == NULL){
@@ -301,7 +272,6 @@ void close(int fd)
 		return ;
 	}
 	file_close(target);
-    // lock_release(&filesys_lock);
 	cur->fdt[fd] = NULL;
 
 	if(fd == cur->next_fd - 1)
