@@ -15,9 +15,9 @@ exec-missing FAIL
 read-bad-ptr PASS
 create-long PASS
 priority-preempt PASS
-fork-close FAIL
+fork-close PASS
 alarm-simultaneous PASS
-fork-boundary FAIL
+fork-boundary PASS
 priority-donate-chain PASS
 create-bound PASS
 rox-multichild FAIL
@@ -37,7 +37,7 @@ args-none PASS
 create-bad-ptr PASS
 read-stdout PASS
 priority-fifo PASS
-wait-bad-pid FAIL
+wait-bad-pid PASS
 exec-read FAIL
 priority-sema PASS
 read-boundary PASS
@@ -49,11 +49,11 @@ write-bad-fd PASS
 alarm-zero PASS
 open-boundary PASS
 create-null PASS
-fork-recursive FAIL
+fork-recursive PASS
 open-bad-ptr PASS
 write-normal PASS
 bad-read PASS
-fork-once FAIL
+fork-once PASS
 priority-change PASS
 write-boundary PASS
 wait-killed FAIL

@@ -71,7 +71,7 @@ static void do_schedule(int status);
 static void schedule (void);
 static tid_t allocate_tid (void);
 static bool tick_less (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
-bool priority_first (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
+bool priority_first (const struct list_elem *a_, const struct list_elem *b_, void *aux );
 static bool is_higher_priority_than_current(struct thread *new_t);
 
 
@@ -205,9 +205,10 @@ thread_create (const char *name, int priority,
 	/* Initialize thread. */
 	init_thread (t, name, priority);
 	tid = t->tid = allocate_tid ();
-
+	
 	//부모 - 자식 매핑
-	thread_current()->child = t;
+	list_push_back(&thread_current()->child_list,&t->c_elem);
+
 	
 	/* Call the kernel_thread if it scheduled.
 	 * Note) rdi is 1st argument, and rsi is 2nd argument. */
@@ -486,6 +487,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 
 	list_init(&t->child_list);
 	sema_init(&t->wait_sema, 0);
+	sema_init(&t->fork_sema,0);
 	t->is_waited = false;
 	t->exit_status = 0; // exit_status 를 처음에 0으로 초기화
 }
@@ -678,7 +680,7 @@ static bool tick_less (const struct list_elem *a_, const struct list_elem *b_, v
 
   return a->sleep_ticks < b->sleep_ticks;
 }
-bool priority_first (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED)
+bool priority_first (const struct list_elem *a_, const struct list_elem *b_, void *aux )
 {
 	const struct thread *a = list_entry(a_,struct thread,elem);
 	const struct thread *b = list_entry(b_,struct thread,elem);

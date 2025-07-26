@@ -7,6 +7,7 @@
 #include "threads/thread.h"
 #include "threads/mmu.h"
 #include "intrinsic.h"
+#include "userprog/process.h"
 
 static uint64_t *
 pgdir_walk (uint64_t *pdp, const uint64_t va, int create) {

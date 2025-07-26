@@ -3,6 +3,11 @@
 
 #include "threads/thread.h"
 
+struct fork_data{
+    struct thread * parent;
+    struct intr_frame * if_ptr;
+};
+
 tid_t process_create_initd (const char *file_name);
 tid_t process_fork (const char *name, struct intr_frame *if_);
 int process_exec (void *f_name);
