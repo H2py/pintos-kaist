@@ -47,7 +47,7 @@ syscall_init (void) {
 
 /* The main system call interface */
 void
-syscall_handler (struct intr_frame *f UNUSED) {
+syscall_handler (struct intr_frame *f) {
 
 	uint64_t sys_numer = f->R.rax;
 	switch(sys_numer){
@@ -58,7 +58,12 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			exit(f->R.rdi);			// status 숫자를 뭘 넣어줘야 하는거지?
 			break;
 		case SYS_FORK:
-			f->R.rax = fork(f->R.rdi);
+			if(is_valid_pointer(f->R.rdi)){
+				f->R.rax = fork(f->R.rdi);
+			}
+			else{
+				exit(-1);
+			}
 			break;	
 		case SYS_EXEC:
 			f->R.rax = exec(f->R.rdi);
@@ -168,7 +173,12 @@ void exit(int status)
 
 tid_t fork (const char *thread_name)
 {
-    return process_fork(thread_name, &thread_current()->tf);
+	tid_t pid;
+	struct intr_frame *if_ = pg_round_up(&thread_name) - sizeof(struct intr_frame);
+	struct intr_frame *if_2 = &thread_current()->tf;
+	//두 인터프레임 차이가 있음
+	pid = process_fork(thread_name, if_);
+    return pid;
 }
 
 
@@ -224,7 +234,7 @@ int read(int fd, void *buffer, unsigned size)
 			return 0; 
 		return bytes_read;
 	}
-} 
+}
 
 int write(int fd, const void *buffer, unsigned size)
 {
@@ -237,7 +247,6 @@ int write(int fd, const void *buffer, unsigned size)
 		cur->exit_status = -1;
 		return -1;
 	}
-
 
     if(fd == 1) {
 		putbuf(buffer, size);

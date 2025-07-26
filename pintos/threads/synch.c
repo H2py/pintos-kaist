@@ -32,7 +32,7 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
-static bool sem_priority_first (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
+static bool sem_priority_first (const struct list_elem *a_, const struct list_elem *b_, void *aux);
 static void priority_donation(void);
 static void remove_donor(struct lock *lock);
 static void sema_test_helper (void *sema_);
@@ -408,7 +408,7 @@ cond_wait (struct condition *cond, struct lock *lock) {
    make sense to try to signal a condition variable within an
    interrupt handler. */
 void
-cond_signal (struct condition *cond, struct lock *lock UNUSED) {
+cond_signal (struct condition *cond, struct lock *lock) {
 	ASSERT (cond != NULL);
 	ASSERT (lock != NULL);
 	ASSERT (!intr_context ());
@@ -436,7 +436,7 @@ cond_broadcast (struct condition *cond, struct lock *lock) {
 		cond_signal (cond, lock);
 }
 
-static bool sem_priority_first (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED)
+static bool sem_priority_first (const struct list_elem *a_, const struct list_elem *b_, void *aux)
 {
 	const struct semaphore_elem *a = list_entry(a_,struct semaphore_elem, elem);
 	const struct semaphore_elem *b = list_entry(b_,struct semaphore_elem, elem);

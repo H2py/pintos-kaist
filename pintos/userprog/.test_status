@@ -17,9 +17,9 @@ exec-arg FAIL
 read-bad-ptr PASS
 create-long PASS
 priority-preempt PASS
-fork-close FAIL
+fork-close PASS
 alarm-simultaneous PASS
-fork-boundary FAIL
+fork-boundary PASS
 priority-donate-chain PASS
 rox-multichild FAIL
 create-bound PASS
@@ -42,8 +42,12 @@ args-none PASS
 create-bad-ptr PASS
 read-stdout PASS
 priority-fifo PASS
+<<<<<<< HEAD
 wait-bad-pid FAIL
 lg-create PASS
+=======
+wait-bad-pid PASS
+>>>>>>> 836aca4701620ff8e8d9f4c9ec8be6f0f793aba1
 exec-read FAIL
 read-boundary PASS
 priority-sema PASS
@@ -57,11 +61,11 @@ sm-random PASS
 alarm-zero PASS
 open-boundary PASS
 create-null PASS
-fork-recursive FAIL
+fork-recursive PASS
 open-bad-ptr PASS
 write-normal PASS
 bad-read PASS
-fork-once FAIL
+fork-once PASS
 priority-change PASS
 write-boundary PASS
 wait-killed FAIL
