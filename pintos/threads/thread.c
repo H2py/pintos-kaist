@@ -301,18 +301,6 @@ thread_tid (void) {
 void
 thread_exit (void) {
 	ASSERT (!intr_context ());
-	struct thread *curr = thread_current ();
-	/* Close all open file descriptors. */
-
-	for(int fd = 3; fd < 64; fd++)
-	{
-		if(curr->fdt[fd] != NULL) {
-			file_close(curr->fdt[fd]);
-			curr->fdt[fd] = NULL;
-		}
-	}
-
-	curr->next_fd = 3;
 
 #ifdef USERPROG
 	process_exit ();
@@ -487,7 +475,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 
 	list_init(&t->child_list);
 	sema_init(&t->wait_sema, 0);
-	sema_init(&t->fork_sema,0);
+	sema_init(&t->fork_sema, 0);
 	t->is_waited = false;
 	t->exit_status = 0; // exit_status 를 처음에 0으로 초기화
 }

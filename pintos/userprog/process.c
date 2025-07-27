@@ -247,32 +247,42 @@ process_wait (tid_t child_tid) {
 	struct list_elem *e;
 	struct thread * child;
 	struct thread * parent = thread_current();
+	int child_exit_status = -1;
 
 	for (e = list_begin(&parent->child_list); e != list_end(&parent->child_list); e = list_next(e))
 	{
 		child = list_entry(e, struct thread, c_elem);
 		if (child_tid == child->tid) {
 			if(child->is_waited){
-				exit(-1);
-			}
-			if(child->status == THREAD_DYING){
-				return child->exit_status;
-			}
-			else{
+				return child_exit_status;
+			} else {
 				child->is_waited = true;
 				sema_down(&child->wait_sema);
-				return child->exit_status;
+				child_exit_status = child->exit_status;
+				list_remove(e);
+				return child_exit_status;
 			}
 		}
 	}
-
-	exit(-1);
+	return child_exit_status;
 }
 
 /* Exit the process. This function is called by thread_exit (). */
 void
 process_exit (void) {
 	struct thread *curr = thread_current ();
+	/* Close all open file descriptors. */
+
+	for(int fd = 3; fd < 64; fd++)
+	{
+		if(curr->fdt[fd] != NULL) {
+			file_close(curr->fdt[fd]);
+			curr->fdt[fd] = NULL;
+		}
+	}
+
+	curr->next_fd = 3;
+
 	if(curr->pml4 != NULL){
 		printf("%s: exit(%d)\n", curr->name, curr->exit_status);
 	}

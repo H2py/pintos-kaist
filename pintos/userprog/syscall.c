@@ -185,16 +185,19 @@ tid_t fork (const char *thread_name)
 /* Create child process and execute program correspond to cmd_line on it*/
 tid_t exec(const char *cmd_line)
 {
-	tid_t pid = fork(cmd_line);
+	char *file_copy = palloc_get_page(0);
+	if(file_copy) {
+		strlcpy(file_copy, cmd_line, PGSIZE);
+		return process_exec(file_copy);
+	}
+	exit(-1);
 
-	if (pid < 0) {
-		printf("fork failed");
-		exit(-1);
-	}
-	else if (pid == 0) {
-		// Child process
-		process_exec(cmd_line);
-	}
+	// if (pid < 0) {
+	// 	exit(-1);
+	// }
+	// else if (pid == 0) {
+	// 	process_exec(cmd_line);
+	// }
 }
 
 /* 자식 프로세스가 종료되기를 기다리고, 자식의 종료 상태를 반환*/
@@ -231,7 +234,7 @@ int read(int fd, void *buffer, unsigned size)
 		if(bytes_read < 0)
 			exit(-1); 
 		else if(bytes_read == 0)
-			return 0; 
+			return 0;
 		return bytes_read;
 	}
 }
