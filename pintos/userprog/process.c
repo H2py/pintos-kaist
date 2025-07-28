@@ -238,9 +238,9 @@ process_exec (void *f_name) {
     success = load (file_name, &_if);
 	
     // 5. 실패 시 처리
-    palloc_free_page (file_name);
     if (!success)
-        return -1;
+		return -1;
+    palloc_free_page (file_name);
 
     // 6. 새로운 프로세스 시작
 	sema_up(&thread_current()->exec_sema);
@@ -274,6 +274,7 @@ process_wait (tid_t child_tid) {
 
 				sema_down(&child->wait_sema);
 				child_exit_status = child->exit_status;
+				sema_up(&child->exit_sema);
 				list_remove(e);
 				return child_exit_status;
 			}
@@ -310,6 +311,7 @@ process_exit (void) {
 	curr->next_fd = 3;
 
 	sema_up(&curr->wait_sema);
+	sema_down(&curr->exit_sema);
 
 	process_cleanup ();
 }
@@ -572,7 +574,6 @@ load (const char *file_name, struct intr_frame *if_) {
 
 done:
 	/* We arrive here whether the load is successful or not. */
-
 	file_close (file);
 	return success;
 }

@@ -471,12 +471,14 @@ static void init_thread(struct thread *t, const char *name, int priority)
     t->running_file = NULL;
     t->child = NULL;
 
-    list_init(&t->child_list);
-    sema_init(&t->wait_sema, 0);
-    sema_init(&t->fork_sema, 0);
-    sema_init(&t->exec_sema, 0);
-    t->is_waited = false;
-    t->exit_status = 0;  // exit_status 를 처음에 0으로 초기화
+
+	list_init(&t->child_list);
+	sema_init(&t->wait_sema, 0);
+	sema_init(&t->fork_sema, 0);
+	sema_init(&t->exit_sema, 0);
+	sema_init(&t->exec_sema, 0);
+	t->is_waited = false;
+	t->exit_status = 0; // exit_status 를 처음에 0으로 초기화
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should

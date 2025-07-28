@@ -193,24 +193,10 @@ tid_t exec(const char *cmd_line)
 	if(file_copy) {
 		strlcpy(file_copy, cmd_line, PGSIZE);
 		result = process_exec(file_copy);
-		palloc_free_page(file_copy);
+		if(file_copy)
+			palloc_free_page(file_copy);
 		return result;
 	}
-
-
-	// tid_t pid;
-	// if((pid = fork(cmd_line)) > 0){
-	// 	exit_status = process_wait(pid);
-	// 	printf("\n%d\n",exit_status);
-	// }
-	// else if(pid < 0){
-	// 	return -1;
-	// }
-	// else{
-	// 	if(process_exec(cmd_line) < 0){
-	// 		return -1;
-	// 	}
-	// }
 }
 
 /* 자식 프로세스가 종료되기를 기다리고, 자식의 종료 상태를 반환*/
@@ -229,11 +215,6 @@ int read(int fd, void *buffer, unsigned size)
 	if(file == NULL)
 		return -1;
 
-	for (unsigned i = 0; i < size; i++) {
-    	if (!put_user((uint8_t *)buffer + i, 0)) { 
-        		return -1;
-    	}
-	}
 
 	if(fd == 0) {							/* stdin에서 읽어옴 */
 		for (int i=0; i < size; i++)
@@ -332,6 +313,13 @@ struct file *get_file_by_fd(int fd)
     return cur->fdt[fd];
 }
 
+
+
+/* Reads a byte at user virtual address UADDR.
+ * UADDR must be below KERN_BASE.
+ * Returns the byte value if successful, -1 if a segfault
+ * occurred. */
+
 static int64_t
 get_user (const uint8_t *uaddr) {
     int64_t result;
@@ -342,6 +330,10 @@ get_user (const uint8_t *uaddr) {
     : "=&a" (result) : "m" (*uaddr));
     return result;
 }
+
+/* Writes BYTE to user address UDST.
+ * UDST must be below KERN_BASE.
+ * Returns true if successful, false if a segfault occurred. */
 
 static bool
 put_user (uint8_t *udst, uint8_t byte) {
