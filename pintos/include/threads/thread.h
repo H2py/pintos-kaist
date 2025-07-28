@@ -114,6 +114,7 @@ struct thread {
 	int exit_status; 					/* child process의 exit_status*/
 	struct semaphore wait_sema; 		/* 부모 대기, 자식이 신호 보내는 세마포어*/
 	struct semaphore fork_sema;
+	struct semaphore exec_sema;
 	bool is_waited;						/* 해당 자식 프로세스를 이미 기다리고 있는지 여부를 다룸*/
 
 	/* Shared between thread.c and synch.c. */
