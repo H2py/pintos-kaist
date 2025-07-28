@@ -105,9 +105,9 @@ process_fork (const char *name, struct intr_frame *if_) {
 		free(data);
 		return TID_ERROR;
 	}
-	// child = list_entry(list_back(&thread_current()->child_list),struct thread,c_elem);
+	child = list_entry(list_back(&thread_current()->child_list),struct thread,c_elem);
 
-	sema_down(&thread_current()->fork_sema);	//child으ㅣ wait sema로 변경
+	sema_down(&child->fork_sema);	//child으ㅣ fork sema로 변경
 		
 	return child_tid;
 }
@@ -187,9 +187,9 @@ __do_fork (void *aux) {
 		goto error;
 #endif
 
-	for(int i =0; i < 63; i++){
-		if(current->fdt[i]){
-			current->fdt[i] = file_duplicate(&parent->fdt[i]);
+	for(int i = 0; i < 63; i++){
+		if(parent->fdt[i]){
+			current->fdt[i] = file_duplicate(parent->fdt[i]);
 		}
 	}
 
@@ -199,7 +199,7 @@ __do_fork (void *aux) {
 
 	/* Finally, switch to the newly created process. */
 	if (succ){
-		sema_up(&parent->fork_sema);
+		sema_up(&thread_current()->fork_sema);
 		do_iret (&if_);
 	}
 error:
@@ -257,6 +257,7 @@ process_wait (tid_t child_tid) {
 				return child_exit_status;
 			} else {
 				child->is_waited = true;
+
 				sema_down(&child->wait_sema);
 				child_exit_status = child->exit_status;
 				list_remove(e);
@@ -286,6 +287,17 @@ process_exit (void) {
 	if(curr->pml4 != NULL){
 		printf("%s: exit(%d)\n", curr->name, curr->exit_status);
 	}
+
+	for(int fd = 3; fd < 64; fd++)
+	{
+		if(curr->fdt[fd] != NULL) {
+			file_close(curr->fdt[fd]);
+			curr->fdt[fd] = NULL;
+		}
+	}
+
+	curr->next_fd = 3;
+
 	sema_up(&curr->wait_sema);
 
 	process_cleanup ();

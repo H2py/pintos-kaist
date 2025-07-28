@@ -80,7 +80,7 @@ lg-seq-block PASS
 wait-simple FAIL
 exec-once FAIL
 args-many PASS
-fork-read FAIL
+fork-read PASS
 write-zero PASS
 alarm-multiple PASS
 create-exists PASS

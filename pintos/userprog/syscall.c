@@ -174,9 +174,9 @@ void exit(int status)
 tid_t fork (const char *thread_name)
 {
 	tid_t pid;
+	
 	struct intr_frame *if_ = pg_round_up(&thread_name) - sizeof(struct intr_frame);
-	struct intr_frame *if_2 = &thread_current()->tf;
-	//두 인터프레임 차이가 있음
+
 	pid = process_fork(thread_name, if_);
     return pid;
 }
@@ -213,13 +213,12 @@ int read(int fd, void *buffer, unsigned size)
 {
     
 	if(fd < 0 || fd > 63)
-		exit(-1);
+		return -1;
 	
 	struct thread *cur = thread_current();
 	struct file *file = cur->fdt[fd];		/* 읽어 올 file 가져오기 */
-	
 	if(file == NULL)
-		exit(-1); 
+		return -1;
 	// TODO : 읽기 권한이 있는지 체크
 	// TODO : Buffer의 크기와 size 간에 관계에 대한 조건을 체크해야 되는지 확인하기
 
@@ -232,7 +231,7 @@ int read(int fd, void *buffer, unsigned size)
 		int bytes_read = file_read(file, buffer, size);
 	
 		if(bytes_read < 0)
-			exit(-1); 
+			return -1; 
 		else if(bytes_read == 0)
 			return 0;
 		return bytes_read;

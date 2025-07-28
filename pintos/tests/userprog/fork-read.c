@@ -35,7 +35,9 @@ test_main (void)
     }
 
     close(handle);
-  } else {
+  } 
+  else 
+  {
     msg ("child run");
 
     byte_cnt = read (handle, buffer + 20, sizeof sample - 21);
