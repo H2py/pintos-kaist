@@ -463,14 +463,13 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->origin_priority = priority;
 	t->wait_on_lock = NULL;
 	list_init(&t->donor_list);
+    t->fdt = palloc_get_multiple(PAL_ZERO, FDT_DEFAULT);
 
-	for (int i = 0; i < 64; i ++)
-		t->fdt[i] = NULL;
+	if(t->fdt == NULL)
+		return TID_ERROR;
 
 	t->next_fd = 3; // 다음 파일 디스크립터 번호를 3으로 초기화
-	// t->max_fd = 3;
 
-	t->parent = NULL;
 	t->child = NULL;
 
 	list_init(&t->child_list);

@@ -274,16 +274,6 @@ process_exit (void) {
 	struct thread *curr = thread_current ();
 	/* Close all open file descriptors. */
 
-	for(int fd = 3; fd < 64; fd++)
-	{
-		if(curr->fdt[fd] != NULL) {
-			file_close(curr->fdt[fd]);
-			curr->fdt[fd] = NULL;
-		}
-	}
-
-	curr->next_fd = 3;
-
 	if(curr->pml4 != NULL){
 		printf("%s: exit(%d)\n", curr->name, curr->exit_status);
 	}
@@ -291,6 +281,7 @@ process_exit (void) {
 	for(int fd = 3; fd < 64; fd++)
 	{
 		if(curr->fdt[fd] != NULL) {
+			file_allow_write(curr->fdt[fd]);
 			file_close(curr->fdt[fd]);
 			curr->fdt[fd] = NULL;
 		}
@@ -551,6 +542,7 @@ load (const char *file_name, struct intr_frame *if_) {
 	if_->R.rsi = argv_p;
 	if_->R.rdi = argc;
 
+	file_deny_write(file);
 	intr_set_level(old_level);
 
 	success = true;

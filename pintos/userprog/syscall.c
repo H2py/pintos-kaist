@@ -10,10 +10,13 @@
 #include "include/filesys/filesys.h"
 #include <console.h>
 #include "userprog/process.h"
+#include "threads/palloc.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
 static struct lock filesys_lock;
+static int64_t get_user (const uint8_t *uaddr);
+static bool put_user (uint8_t *udst, uint8_t byte);
 
 /* System call.
  *
@@ -158,9 +161,6 @@ int open(const char *file)
 
 int filesize(int fd)
 {
-	if(get_file_by_fd(fd) == NULL){
-		
-	}
     return file_length(get_file_by_fd(fd));
 }
 
@@ -185,19 +185,16 @@ tid_t fork (const char *thread_name)
 /* Create child process and execute program correspond to cmd_line on it*/
 tid_t exec(const char *cmd_line)
 {
-	char *file_copy = palloc_get_page(0);
+	if(!is_valid_pointer(cmd_line)) 
+		exit(-1);
+
+	char *file_copy = palloc_get_page(PAL_ZERO);
 	if(file_copy) {
 		strlcpy(file_copy, cmd_line, PGSIZE);
 		return process_exec(file_copy);
 	}
+	
 	exit(-1);
-
-	// if (pid < 0) {
-	// 	exit(-1);
-	// }
-	// else if (pid == 0) {
-	// 	process_exec(cmd_line);
-	// }
 }
 
 /* 자식 프로세스가 종료되기를 기다리고, 자식의 종료 상태를 반환*/
@@ -210,17 +207,17 @@ int wait(tid_t pid)
 }
 
 int read(int fd, void *buffer, unsigned size)
-{
-    
-	if(fd < 0 || fd > 63)
-		return -1;
-	
+{	
 	struct thread *cur = thread_current();
-	struct file *file = cur->fdt[fd];		/* 읽어 올 file 가져오기 */
+	struct file *file = get_file_by_fd(fd);		/* 읽어 올 file 가져오기 */
 	if(file == NULL)
 		return -1;
-	// TODO : 읽기 권한이 있는지 체크
-	// TODO : Buffer의 크기와 size 간에 관계에 대한 조건을 체크해야 되는지 확인하기
+
+	for (unsigned i = 0; i < size; i++) {
+    	if (!put_user((uint8_t *)buffer + i, 0)) { 
+        		return -1;
+    	}
+	}
 
 	if(fd == 0) {							/* stdin에서 읽어옴 */
 		for (int i=0; i < size; i++)
@@ -230,10 +227,8 @@ int read(int fd, void *buffer, unsigned size)
 	else {
 		int bytes_read = file_read(file, buffer, size);
 	
-		if(bytes_read < 0)
-			return -1; 
-		else if(bytes_read == 0)
-			return 0;
+		if(bytes_read < 0) return -1; 
+		else if(bytes_read == 0) return 0;
 		return bytes_read;
 	}
 }
@@ -244,32 +239,36 @@ int write(int fd, const void *buffer, unsigned size)
 	struct thread *cur = thread_current();
 	struct file *file = cur->fdt[fd];
 
-
 	if(fd < 0 || fd > 63){
 		cur->exit_status = -1;
 		return -1;
 	}
 
+    for (unsigned i = 0; i < size; i++) {
+        if (get_user((const uint8_t *)buffer + i) == -1) {
+            cur->exit_status = -1;
+            return -1;
+        }
+    }
+
     if(fd == 1) {
 		putbuf(buffer, size);
 		return size;
 	}
-	else if(file == NULL){
+	
+	if(file == NULL){
 		cur->exit_status = -1;
 		return -1;
 	} 
-    else {
-        int byte_write = file_write(file, buffer, size); // If error occurs use the int32_t
-
-        if(byte_write < 0){
-			cur->exit_status = -1;
-			return -1;
-		} 
-        else if (byte_write == 0) return 0;
-        return byte_write;		
-    }
     
-    return -1;
+    int byte_write = file_write(file, buffer, size); // If error occurs use the int32_t
+
+    if(byte_write < 0){
+		cur->exit_status = -1;
+		return -1;
+	} 
+    else if (byte_write == 0) return 0;
+    return byte_write;		
 }
 
 /* Fix */
@@ -310,12 +309,31 @@ static bool is_valid_pointer(void * ptr){
 
 struct file *get_file_by_fd(int fd)
 {
-    if(fd < 0 || fd > 63)
+	struct thread *cur = thread_current();
+    if(fd < 0 || fd > 63 || FDCOUNT_LIMIT)
         return NULL;
-    struct thread *cur = thread_current();
-    
-    if(cur->fdt[fd] == NULL)
-		return NULL; 
 
     return cur->fdt[fd];
+}
+
+static int64_t
+get_user (const uint8_t *uaddr) {
+    int64_t result;
+    __asm __volatile (
+    "movabsq $done_get, %0\n"
+    "movzbq %1, %0\n"
+    "done_get:\n"
+    : "=&a" (result) : "m" (*uaddr));
+    return result;
+}
+
+static bool
+put_user (uint8_t *udst, uint8_t byte) {
+    int64_t error_code;
+    __asm __volatile (
+    "movabsq $done_put, %0\n"
+    "movb %b2, %1\n"
+    "done_put:\n"
+    : "=&a" (error_code), "=m" (*udst) : "q" (byte));
+    return error_code != -1;
 }
