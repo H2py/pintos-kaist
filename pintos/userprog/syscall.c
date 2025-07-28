@@ -15,6 +15,8 @@
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
 static struct lock filesys_lock;
+static int64_t get_user (const uint8_t *uaddr);
+static bool put_user (uint8_t *udst, uint8_t byte);
 
 /* System call.
  *
@@ -194,24 +196,10 @@ tid_t exec(const char *cmd_line)
 	if(file_copy) {
 		strlcpy(file_copy, cmd_line, PGSIZE);
 		result = process_exec(file_copy);
-		palloc_free_page(file_copy);
+		if(file_copy)
+			palloc_free_page(file_copy);
 		return result;
 	}
-
-
-	// tid_t pid;
-	// if((pid = fork(cmd_line)) > 0){
-	// 	exit_status = process_wait(pid);
-	// 	printf("\n%d\n",exit_status);
-	// }
-	// else if(pid < 0){
-	// 	return -1;
-	// }
-	// else{
-	// 	if(process_exec(cmd_line) < 0){
-	// 		return -1;
-	// 	}
-	// }
 }
 
 /* 자식 프로세스가 종료되기를 기다리고, 자식의 종료 상태를 반환*/
@@ -233,8 +221,6 @@ int read(int fd, void *buffer, unsigned size)
 	struct file *file = cur->fdt[fd];		/* 읽어 올 file 가져오기 */
 	if(file == NULL)
 		return -1;
-	// TODO : 읽기 권한이 있는지 체크
-	// TODO : Buffer의 크기와 size 간에 관계에 대한 조건을 체크해야 되는지 확인하기
 
 	if(fd == 0) {							/* stdin에서 읽어옴 */
 		for (int i=0; i < size; i++)
@@ -332,4 +318,35 @@ struct file *get_file_by_fd(int fd)
 		return NULL; 
 
     return cur->fdt[fd];
+}
+
+
+
+/* Reads a byte at user virtual address UADDR.
+ * UADDR must be below KERN_BASE.
+ * Returns the byte value if successful, -1 if a segfault
+ * occurred. */
+static int64_t
+get_user (const uint8_t *uaddr) {
+    int64_t result;
+    __asm __volatile (
+    "movabsq $done_get, %0\n"
+    "movzbq %1, %0\n"
+    "done_get:\n"
+    : "=&a" (result) : "m" (*uaddr));
+    return result;
+}
+
+/* Writes BYTE to user address UDST.
+ * UDST must be below KERN_BASE.
+ * Returns true if successful, false if a segfault occurred. */
+static bool
+put_user (uint8_t *udst, uint8_t byte) {
+    int64_t error_code;
+    __asm __volatile (
+    "movabsq $done_put, %0\n"
+    "movb %b2, %1\n"
+    "done_put:\n"
+    : "=&a" (error_code), "=m" (*udst) : "q" (byte));
+    return error_code != -1;
 }
