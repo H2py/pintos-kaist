@@ -10,6 +10,7 @@
 #include "include/filesys/filesys.h"
 #include <console.h>
 #include "userprog/process.h"
+#include "threads/palloc.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -33,7 +34,6 @@ static struct lock filesys_lock;
 
 void
 syscall_init (void) {
-    lock_init(&filesys_lock);
 	write_msr(MSR_STAR, ((uint64_t)SEL_UCSEG - 0x10) << 48  |
 			((uint64_t)SEL_KCSEG) << 32);
 	write_msr(MSR_LSTAR, (uint64_t) syscall_entry);
@@ -185,18 +185,32 @@ tid_t fork (const char *thread_name)
 /* Create child process and execute program correspond to cmd_line on it*/
 tid_t exec(const char *cmd_line)
 {
-	char *file_copy = palloc_get_page(0);
+	int result;
+	if(!is_valid_pointer(cmd_line)){
+		exit(-1);
+	}
+
+	char *file_copy = palloc_get_page(PAL_ZERO);
 	if(file_copy) {
 		strlcpy(file_copy, cmd_line, PGSIZE);
-		return process_exec(file_copy);
+		result = process_exec(file_copy);
+		palloc_free_page(file_copy);
+		return result;
 	}
-	exit(-1);
 
-	// if (pid < 0) {
-	// 	exit(-1);
+
+	// tid_t pid;
+	// if((pid = fork(cmd_line)) > 0){
+	// 	exit_status = process_wait(pid);
+	// 	printf("\n%d\n",exit_status);
 	// }
-	// else if (pid == 0) {
-	// 	process_exec(cmd_line);
+	// else if(pid < 0){
+	// 	return -1;
+	// }
+	// else{
+	// 	if(process_exec(cmd_line) < 0){
+	// 		return -1;
+	// 	}
 	// }
 }
 
