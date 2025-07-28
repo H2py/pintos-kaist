@@ -269,13 +269,6 @@ int write(int fd, const void *buffer, unsigned size)
         return -1;
     }
 
-	if(file == cur->running_file)
-	{
-		file_allow_write(file);
-		cur->running_file = NULL;
-		return 0;
-	}
-
     int byte_write = file_write(file, buffer, size);
     if (byte_write < 0)
     {
