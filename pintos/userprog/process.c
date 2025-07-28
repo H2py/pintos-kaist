@@ -53,6 +53,8 @@ process_create_initd (const char *file_name) {
 	tid_t tid;
 	char * file_token;	// FIX file_token 변수 : 스레드 생성 시 스레드명을 파일명으로 동일하게 넣어주기 위한 token 변수
 	char * save_ptr;
+	struct list_elem *e;
+	struct thread * child;
 
 	/* Make a copy of FILE_NAME.
 	 * Otherwise there's a race between the caller and load(). */
@@ -68,7 +70,18 @@ process_create_initd (const char *file_name) {
 	/* Create a new thread to execute FILE_NAME. */
 	tid = thread_create (file_token, PRI_DEFAULT, initd, fn_copy);	
 	if (tid == TID_ERROR)
-		palloc_free_page (fn_copy);	
+		palloc_free_page (fn_copy);
+	
+	for (e = list_begin(&thread_current()->child_list); e != list_end(&thread_current()->child_list); e = list_next(e))
+	{
+		child = list_entry(e, struct thread, c_elem);
+		if (tid == child->tid) {
+			break;
+		}
+	}
+	sema_down(&child->exec_sema);
+	remove(e);
+
 	return tid;
 }
 
@@ -223,13 +236,14 @@ process_exec (void *f_name) {
 
     // 4. 새로운 바이너리 로드
     success = load (file_name, &_if);
-
+	
     // 5. 실패 시 처리
     palloc_free_page (file_name);
     if (!success)
         return -1;
 
     // 6. 새로운 프로세스 시작
+	sema_up(&thread_current()->exec_sema);
     do_iret (&_if);
     NOT_REACHED ();
 }
@@ -273,16 +287,6 @@ void
 process_exit (void) {
 	struct thread *curr = thread_current ();
 	/* Close all open file descriptors. */
-
-	for(int fd = 3; fd < 64; fd++)
-	{
-		if(curr->fdt[fd] != NULL) {
-			file_close(curr->fdt[fd]);
-			curr->fdt[fd] = NULL;
-		}
-	}
-
-	curr->next_fd = 3;
 
 	if(curr->pml4 != NULL){
 		printf("%s: exit(%d)\n", curr->name, curr->exit_status);
@@ -519,6 +523,8 @@ load (const char *file_name, struct intr_frame *if_) {
 	/* Start address. */
 	if_->rip = ehdr.e_entry;
 
+	file_deny_write(file);
+
 	enum intr_level old_level = intr_disable();
 	//argc는 마지막 null 개수까지 포함하고 있다.
 	for(i = argc - 1; i >= 0; i--){	//스택에 파싱한 인자 값 저장
@@ -557,6 +563,7 @@ load (const char *file_name, struct intr_frame *if_) {
 
 done:
 	/* We arrive here whether the load is successful or not. */
+
 	file_close (file);
 	return success;
 }
