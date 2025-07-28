@@ -1,13 +1,13 @@
 exec-bad-ptr PASS
 sm-full PASS
 rox-simple FAIL
->>>>>>> 836aca4701620ff8e8d9f4c9ec8be6f0f793aba1
 fork-multiple PASS
 args-dbl-space PASS
 read-bad-fd PASS
 priority-donate-multiple PASS
 args-multiple PASS
 lg-seq-random PASS
+syn-write FAIL
 syn-remove PASS
 priority-donate-one PASS
 create-normal PASS
@@ -18,7 +18,6 @@ exec-arg PASS
 exec-missing PASS
 read-bad-ptr PASS
 create-long PASS
-======= 
 priority-preempt PASS
 fork-close PASS
 alarm-simultaneous PASS
@@ -51,7 +50,6 @@ exec-read PASS
 priority-sema PASS
 read-boundary PASS
 wait-twice PASS
-<<<<<<< HEAD
 exec-boundary PASS
 close-normal PASS
 sm-create PASS
@@ -94,3 +92,4 @@ args-single PASS
 write-stdin PASS
 read-zero PASS
 bad-read2 PASS
+syn-read FAIL

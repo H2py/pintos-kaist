@@ -160,9 +160,6 @@ int open(const char *file)
 
 int filesize(int fd)
 {
-	if(get_file_by_fd(fd) == NULL){
-		
-	}
     return file_length(get_file_by_fd(fd));
 }
 
@@ -212,15 +209,12 @@ int wait(tid_t pid)
 }
 
 int read(int fd, void *buffer, unsigned size)
-{
-    
-	if(fd < 0 || fd > 63)
-		return -1;
-	
+{	
 	struct thread *cur = thread_current();
-	struct file *file = cur->fdt[fd];		/* 읽어 올 file 가져오기 */
+	struct file *file = get_file_by_fd(fd);		/* 읽어 올 file 가져오기 */
 	if(file == NULL)
 		return -1;
+
 
 	if(fd == 0) {							/* stdin에서 읽어옴 */
 		for (int i=0; i < size; i++)
@@ -230,10 +224,8 @@ int read(int fd, void *buffer, unsigned size)
 	else {
 		int bytes_read = file_read(file, buffer, size);
 	
-		if(bytes_read < 0)
-			return -1; 
-		else if(bytes_read == 0)
-			return 0;
+		if(bytes_read < 0) return -1; 
+		else if(bytes_read == 0) return 0;
 		return bytes_read;
 	}
 }
@@ -244,32 +236,36 @@ int write(int fd, const void *buffer, unsigned size)
 	struct thread *cur = thread_current();
 	struct file *file = cur->fdt[fd];
 
-
 	if(fd < 0 || fd > 63){
 		cur->exit_status = -1;
 		return -1;
 	}
 
+    for (unsigned i = 0; i < size; i++) {
+        if (get_user((const uint8_t *)buffer + i) == -1) {
+            cur->exit_status = -1;
+            return -1;
+        }
+    }
+
     if(fd == 1) {
 		putbuf(buffer, size);
 		return size;
 	}
-	else if(file == NULL){
+	
+	if(file == NULL){
 		cur->exit_status = -1;
 		return -1;
 	} 
-    else {
-        int byte_write = file_write(file, buffer, size); // If error occurs use the int32_t
-
-        if(byte_write < 0){
-			cur->exit_status = -1;
-			return -1;
-		} 
-        else if (byte_write == 0) return 0;
-        return byte_write;		
-    }
     
-    return -1;
+    int byte_write = file_write(file, buffer, size); // If error occurs use the int32_t
+
+    if(byte_write < 0){
+		cur->exit_status = -1;
+		return -1;
+	} 
+    else if (byte_write == 0) return 0;
+    return byte_write;		
 }
 
 /* Fix */
@@ -310,12 +306,9 @@ static bool is_valid_pointer(void * ptr){
 
 struct file *get_file_by_fd(int fd)
 {
-    if(fd < 0 || fd > 63)
+	struct thread *cur = thread_current();
+    if(fd < 0 || fd > 63 || FDCOUNT_LIMIT)
         return NULL;
-    struct thread *cur = thread_current();
-    
-    if(cur->fdt[fd] == NULL)
-		return NULL; 
 
     return cur->fdt[fd];
 }
@@ -326,6 +319,7 @@ struct file *get_file_by_fd(int fd)
  * UADDR must be below KERN_BASE.
  * Returns the byte value if successful, -1 if a segfault
  * occurred. */
+
 static int64_t
 get_user (const uint8_t *uaddr) {
     int64_t result;
@@ -340,6 +334,7 @@ get_user (const uint8_t *uaddr) {
 /* Writes BYTE to user address UDST.
  * UDST must be below KERN_BASE.
  * Returns true if successful, false if a segfault occurred. */
+
 static bool
 put_user (uint8_t *udst, uint8_t byte) {
     int64_t error_code;

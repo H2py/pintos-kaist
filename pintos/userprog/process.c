@@ -293,9 +293,16 @@ process_exit (void) {
 		printf("%s: exit(%d)\n", curr->name, curr->exit_status);
 	}
 
+	if(curr->running_file) {
+		file_allow_write(curr->running_file);
+		file_close(curr->running_file);
+		curr->running_file = NULL;
+	}
+
 	for(int fd = 3; fd < 64; fd++)
 	{
 		if(curr->fdt[fd] != NULL) {
+			file_allow_write(curr->fdt[fd]);
 			file_close(curr->fdt[fd]);
 			curr->fdt[fd] = NULL;
 		}
@@ -559,6 +566,8 @@ load (const char *file_name, struct intr_frame *if_) {
 	if_->R.rsi = argv_p;
 	if_->R.rdi = argc;
 
+	file_deny_write(file);
+	t->running_file = file;
 	intr_set_level(old_level);
 
 	success = true;
