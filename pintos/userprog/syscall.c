@@ -15,9 +15,9 @@
 #include "userprog/gdt.h"
 #include "userprog/process.h"
 
+struct lock global_lock;
 void syscall_entry(void);
 void syscall_handler(struct intr_frame *);
-static struct lock filesys_lock;
 static int64_t get_user(const uint8_t *uaddr);
 static bool put_user(uint8_t *udst, uint8_t byte);
 
@@ -35,10 +35,10 @@ static bool put_user(uint8_t *udst, uint8_t byte);
 #define MSR_SYSCALL_MASK 0xc0000084 /* Mask for the eflags */
 
 static bool is_valid_pointer(void *);
-static struct lock filesys_lock;
 
 void syscall_init(void)
 {
+	lock_init(&global_lock);
     write_msr(MSR_STAR, ((uint64_t) SEL_UCSEG - 0x10) << 48 |
                             ((uint64_t) SEL_KCSEG) << 32);
     write_msr(MSR_LSTAR, (uint64_t) syscall_entry);
@@ -47,7 +47,7 @@ void syscall_init(void)
      * until the syscall_entry swaps the userland stack to the kernel
      * mode stack. Therefore, we masked the FLAG_FL. */
     write_msr(MSR_SYSCALL_MASK,
-              FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
+              FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);	
 }
 
 /* The main system call interface */
@@ -106,12 +106,12 @@ void syscall_handler(struct intr_frame *f)
             close(f->R.rdi);
             break;
             // projec 3
-            // case SYS_MMAP:
-            // 	printf("dd");
-            // 	break;
-            // case SYS_MUNMAP:
-            // 	printf("dd");
-            // 	break;
+        case SYS_MMAP:
+            	printf("dd");
+            	break;
+        case SYS_MUNMAP:
+            	printf("dd");
+            	break;
     }
     // thread_exit ();
 }
@@ -207,10 +207,16 @@ tid_t exec(const char *cmd_line)
     if (file_copy)
     {
         strlcpy(file_copy, cmd_line, PGSIZE);
+
         result = process_exec(file_copy);
-        if (file_copy) palloc_free_page(file_copy);
+
+        // if (file_copy) palloc_free_page(file_copy);
+
         return result;
     }
+	else{
+		return -1;
+	}
 }
 
 /* 자식 프로세스가 종료되기를 기다리고, 자식의 종료 상태를 반환*/
@@ -236,7 +242,11 @@ int read(int fd, void *buffer, unsigned size)
     }
     else
     {	
+		lock_acquire(&global_lock);
+
         int bytes_read = file_read(file, buffer, size);
+
+		lock_release(&global_lock);
 
         if (bytes_read < 0)
             return -1;
@@ -269,7 +279,10 @@ int write(int fd, const void *buffer, unsigned size)
         return -1;
     }
 
+    lock_acquire(&global_lock);
     int byte_write = file_write(file, buffer, size);
+    lock_release(&global_lock);
+
     if (byte_write < 0)
     {
         cur->exit_status = -1;
@@ -290,7 +303,10 @@ void close(int fd)
         cur->exit_status = -1;
         return;
     }
+    lock_acquire(&global_lock);
     file_close(target);
+    lock_release(&global_lock);
+
     cur->fdt[fd] = NULL;
 
     if (fd == cur->next_fd - 1) cur->next_fd--;
