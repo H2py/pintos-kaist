@@ -396,7 +396,6 @@ cond_wait (struct condition *cond, struct lock *lock) {
 	// list_push_back (&cond->waiters, &waiter.elem);
 	lock_release (lock);
 	sema_down (&waiter.semaphore); // lock acquire을 기다리는 waitlist
-   
    lock_acquire (lock);
 }
 

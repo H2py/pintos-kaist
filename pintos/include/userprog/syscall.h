@@ -17,6 +17,6 @@ int filesize(int fd);
 void close(int fd);
 bool remove(const char *file);
 struct file *get_file_by_fd(int fd);
-// struct lock filesys_lock;
+extern struct lock filesys_lock;
 
 #endif /* userprog/syscall.h */
