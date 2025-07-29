@@ -462,10 +462,12 @@ static void init_thread(struct thread *t, const char *name, int priority)
     t->origin_priority = priority;
     t->wait_on_lock = NULL;
     list_init(&t->donor_list);
-    t->fdt = palloc_get_multiple(PAL_ZERO, FDT_DEFAULT);
+    // t->fdt = palloc_get_multiple(PAL_ZERO, FDT_DEFAULT);
 
-    if (t->fdt == NULL) return TID_ERROR;
-
+    // if (t->fdt == NULL) return TID_ERROR;
+    for(int i =3;i<64;i++){
+        t->fdt[i] = NULL;
+    }
     t->next_fd = 3;  // 다음 파일 디스크립터 번호를 3으로 초기화
 
     t->running_file = NULL;
@@ -473,8 +475,8 @@ static void init_thread(struct thread *t, const char *name, int priority)
     t->parent = NULL;
 
 
-	  list_init(&t->child_list);
-	  sema_init(&t->wait_sema, 0);
+	list_init(&t->child_list);
+	sema_init(&t->wait_sema, 0);
   	sema_init(&t->fork_sema, 0);
   	sema_init(&t->exit_sema, 0);
   	sema_init(&t->exec_sema, 0);

@@ -1,4 +1,5 @@
 #include "userprog/process.h"
+#include "userprog/syscall.h"
 
 #include <debug.h>
 #include <inttypes.h>
@@ -6,7 +7,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
 #include "filesys/directory.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
@@ -57,7 +57,6 @@ tid_t process_create_initd(const char *file_name)
     char *save_ptr;
     struct list_elem *e;
     struct thread *child;
-
     /* Make a copy of FILE_NAME.
      * Otherwise there's a race between the caller and load(). */
 
@@ -114,13 +113,11 @@ tid_t process_fork(const char *name, struct intr_frame *if_)
     data->if_ptr = if_;
 
     /* Clone current thread to new thread.*/
-    child_tid = thread_create(name, PRI_DEFAULT, __do_fork, data);
+    child_tid = 
+            thread_create(name, PRI_DEFAULT, __do_fork, data);
 
-    if (child_tid == TID_ERROR)
-    {
-        free(data);
-        return TID_ERROR;
-    }
+    if (child_tid == TID_ERROR) return TID_ERROR;
+
     child = list_entry(list_back(&thread_current()->child_list), struct thread,
                        c_elem);
 
@@ -224,6 +221,7 @@ static void __do_fork(void *aux)
         do_iret(&if_);
     }
 error:
+    sema_up(&thread_current()->fork_sema);
     thread_exit();
 }
 
@@ -251,6 +249,7 @@ int process_exec(void *f_name)
 
     // 6. 새로운 프로세스 시작
     sema_up(&thread_current()->exec_sema);
+
     do_iret(&_if);
     NOT_REACHED();
 }
@@ -278,6 +277,7 @@ int process_wait(tid_t child_tid)
         {
             if (child->is_waited)
             {
+
                 return child_exit_status;
             }
             else
@@ -433,6 +433,7 @@ static bool load_segment(struct file *file, off_t ofs, uint8_t *upage,
  * Returns true if successful, false otherwise. */
 static bool load(const char *file_name, struct intr_frame *if_)
 {
+    lock_acquire(&global_lock); 
     // FIX 고정 크기 매개변수 배열 생성
     static char *argv_addrs[LOADER_ARGS_LEN / 2 + 1];
     static char *argv[LOADER_ARGS_LEN / 2 + 1];
@@ -467,8 +468,9 @@ static bool load(const char *file_name, struct intr_frame *if_)
     target_file = argv[0];
 
     /* Open executable file. */
+    
     file = filesys_open(target_file);  // 디스크에서 실행 파일을 열어서 읽기
-                                       // 준비
+    
     if (file == NULL)
     {
         printf("load: %s: open failed\n", target_file);
@@ -476,13 +478,17 @@ static bool load(const char *file_name, struct intr_frame *if_)
     }
 
 	file_deny_write(file);
-  
+
+    
 	struct file *dup_file = file_duplicate(file);
+    
+
 	t->running_file = dup_file;
 
 
     /* Read and verify executable header. */
     // 읽고, ELF 헤더 검증
+
     if (file_read(file, &ehdr, sizeof ehdr) != sizeof ehdr ||
         memcmp(ehdr.e_ident, "\177ELF\2\1\1", 7)    // ELF 매직 넘버 확인
         || ehdr.e_type != 2                         // 실행 파일 타입
@@ -497,6 +503,7 @@ static bool load(const char *file_name, struct intr_frame *if_)
 
     /* Read program headers. */
     file_ofs = ehdr.e_phoff;  // 프로그램 헤더 오프셋
+
     for (i = 0; i < ehdr.e_phnum; i++)
     {
         struct Phdr phdr;
@@ -558,6 +565,7 @@ static bool load(const char *file_name, struct intr_frame *if_)
         }
     }
 
+
     /* Set up stack. */
     if (!setup_stack(if_)) goto done;
 
@@ -604,7 +612,9 @@ static bool load(const char *file_name, struct intr_frame *if_)
 
 done:
     /* We arrive here whether the load is successful or not. */
+    lock_release(&global_lock);
     file_close(file);
+
     return success;
 }
 
