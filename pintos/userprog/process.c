@@ -476,6 +476,7 @@ static bool load(const char *file_name, struct intr_frame *if_)
     }
 
 	file_deny_write(file);
+  
 	struct file *dup_file = file_duplicate(file);
 	t->running_file = dup_file;
 

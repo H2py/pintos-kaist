@@ -211,7 +211,7 @@ populate_pools (struct area *base_mem, struct area *ext_mem) {
 
 			start = (uint64_t)
 				pg_round_up (start >= usable_bound ? start : usable_bound);
-split:
+split: 
 			if (page_from_pool (&kernel_pool, (void *) start))
 				pool = &kernel_pool;
 			else if (page_from_pool (&user_pool, (void *) start))
