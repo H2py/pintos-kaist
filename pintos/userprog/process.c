@@ -1,4 +1,5 @@
 #include "userprog/process.h"
+#include "userprog/syscall.h"
 
 #include <debug.h>
 #include <inttypes.h>
@@ -6,7 +7,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "userprog/syscall.h"
 #include "filesys/directory.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
@@ -433,6 +433,7 @@ static bool load_segment(struct file *file, off_t ofs, uint8_t *upage,
  * Returns true if successful, false otherwise. */
 static bool load(const char *file_name, struct intr_frame *if_)
 {
+    lock_acquire(&global_lock); 
     // FIX 고정 크기 매개변수 배열 생성
     static char *argv_addrs[LOADER_ARGS_LEN / 2 + 1];
     static char *argv[LOADER_ARGS_LEN / 2 + 1];
@@ -467,10 +468,9 @@ static bool load(const char *file_name, struct intr_frame *if_)
     target_file = argv[0];
 
     /* Open executable file. */
-    lock_acquire(&global_lock); 
+    
     file = filesys_open(target_file);  // 디스크에서 실행 파일을 열어서 읽기
-                                       // 준비
-    lock_release(&global_lock);
+    
     if (file == NULL)
     {
         printf("load: %s: open failed\n", target_file);
@@ -479,16 +479,15 @@ static bool load(const char *file_name, struct intr_frame *if_)
 
 	file_deny_write(file);
 
-    lock_acquire(&global_lock);
+    
 	struct file *dup_file = file_duplicate(file);
-    lock_release(&global_lock);
+    
 
 	t->running_file = dup_file;
 
 
     /* Read and verify executable header. */
     // 읽고, ELF 헤더 검증
-    lock_acquire(&global_lock);
 
     if (file_read(file, &ehdr, sizeof ehdr) != sizeof ehdr ||
         memcmp(ehdr.e_ident, "\177ELF\2\1\1", 7)    // ELF 매직 넘버 확인
@@ -501,11 +500,9 @@ static bool load(const char *file_name, struct intr_frame *if_)
         printf("load: %s: error loading executable\n", file_name);
         goto done;
     }
-    lock_release(&global_lock);
 
     /* Read program headers. */
     file_ofs = ehdr.e_phoff;  // 프로그램 헤더 오프셋
-    lock_acquire(&global_lock);
 
     for (i = 0; i < ehdr.e_phnum; i++)
     {
@@ -567,7 +564,6 @@ static bool load(const char *file_name, struct intr_frame *if_)
                 break;
         }
     }
-    lock_release(&global_lock);
 
 
     /* Set up stack. */
@@ -616,6 +612,7 @@ static bool load(const char *file_name, struct intr_frame *if_)
 
 done:
     /* We arrive here whether the load is successful or not. */
+    lock_release(&global_lock);
     file_close(file);
 
     return success;

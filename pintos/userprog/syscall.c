@@ -146,7 +146,10 @@ int open(const char *file)
         return ret;
     }
 
+    lock_acquire(&global_lock);
     struct file *f = filesys_open(file);
+    lock_release(&global_lock);
+
     if (f == NULL)
     {
         cur->exit_status = -1;
@@ -243,9 +246,7 @@ int read(int fd, void *buffer, unsigned size)
     else
     {	
 		lock_acquire(&global_lock);
-
         int bytes_read = file_read(file, buffer, size);
-
 		lock_release(&global_lock);
 
         if (bytes_read < 0)
@@ -303,9 +304,8 @@ void close(int fd)
         cur->exit_status = -1;
         return;
     }
-    lock_acquire(&global_lock);
+
     file_close(target);
-    lock_release(&global_lock);
 
     cur->fdt[fd] = NULL;
 
