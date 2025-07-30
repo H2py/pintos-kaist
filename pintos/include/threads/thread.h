@@ -118,6 +118,8 @@ struct thread {
 	struct semaphore exit_sema;
 	bool is_waited;						/* 해당 자식 프로세스를 이미 기다리고 있는지 여부를 다룸*/
 
+	struct intr_frame fork_tf;
+
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
 

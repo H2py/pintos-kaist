@@ -60,7 +60,7 @@ void syscall_handler(struct intr_frame *f)
             exit(f->R.rdi);  //status 숫자를 뭘 넣어줘야 하는거지?
             break;
         case SYS_FORK:
-            f->R.rax = fork(f->R.rdi);
+            f->R.rax = fork(f->R.rdi, f);
             break;
         case SYS_EXEC:
             f->R.rax = exec(f->R.rdi);
@@ -137,11 +137,10 @@ int open(const char *file)
 
     if (f == NULL) return -1;
 
-    for (int fd = 2; fd < 128; fd++) {
+    for (int fd = 2; fd < 20; fd++) {
         if (cur->fdt[fd] == NULL)
         {
             cur->fdt[fd] = f;
-            cur->next_fd = fd;
             return fd;
         }
     }
@@ -161,9 +160,9 @@ void exit(int status)
     thread_exit();
 }
 
-tid_t fork(const char *thread_name)
+tid_t fork(const char *thread_name, struct intr_frame *if_)
 {
-    struct intr_frame *if_ = pg_round_up(&thread_name) - sizeof(struct intr_frame);
+    // struct intr_frame *if_ = pg_round_up(&thread_name) - sizeof(struct intr_frame);
 
     return process_fork(thread_name, if_);
 }
@@ -182,6 +181,7 @@ tid_t exec(const char *cmd_line)
     result = process_exec(file_copy);
     
     palloc_free_page(file_copy);
+
     return result;
 }
 
@@ -239,8 +239,6 @@ void close(int fd)
 
     file_close(target);
     cur->fdt[fd] = NULL;
-
-    if (fd == cur->next_fd - 1) cur->next_fd--;
 }
 
 unsigned tell(int fd)
@@ -261,6 +259,6 @@ static bool is_valid_pointer(void *ptr)
 
 struct file *get_file_by_fd(int fd)
 {
-    if (fd < 0 || fd > 128 || (thread_current()->fdt[fd] == NULL)) return NULL;
+    if (fd < 0 || fd >= 20 || (thread_current()->fdt[fd] == NULL)) return NULL;
     return thread_current()->fdt[fd];
 }
