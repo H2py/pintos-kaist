@@ -102,7 +102,8 @@ struct thread {
 	
 	struct list donor_list;
 	struct list_elem d_elem;
-	struct file **fdt;         		/* file descriptor table을 배열 포인터로 선언, 사용할 때는 투 포인터를 사용한다*/
+	// struct file *fdt[128];         		/* file descriptor table을 배열 포인터로 선언, 사용할 때는 투 포인터를 사용한다*/
+	struct file **fdt;
 	struct file *running_file;
 	int next_fd;                        /* 다음 파일 디스크립터 번호를 저장한다. next_fd = 3, 새로 open한 파일에 fd=3 배정하고 next_fd++를 사용하여 다음부터 4 사용하게 함*/
 	struct thread *parent;
@@ -115,7 +116,6 @@ struct thread {
 	struct semaphore fork_sema;
 	struct semaphore exec_sema;
 	struct semaphore exit_sema;
-	
 	bool is_waited;						/* 해당 자식 프로세스를 이미 기다리고 있는지 여부를 다룸*/
 
 	struct intr_frame fork_tf;

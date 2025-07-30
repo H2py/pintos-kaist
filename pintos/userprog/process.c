@@ -61,8 +61,6 @@ tid_t process_create_initd(const char *file_name)
 
     /* Create a new thread to execute FILE_NAME. */
     tid = thread_create(file_token, PRI_DEFAULT, initd, fn_copy);
-    if (tid == TID_ERROR) palloc_free_page(fn_copy);
-
 
     if (tid == TID_ERROR){
         palloc_free_page(fn_copy);
@@ -119,13 +117,14 @@ tid_t process_fork(const char *name, struct intr_frame *if_)
 
     /* Clone current thread to new thread.*/
     child_tid = thread_create(name, PRI_DEFAULT, __do_fork, data);
-    if (child_tid == TID_ERROR) 
-    {
-        free(data);   
-        return TID_ERROR; 
-    } 
+
+    if (child_tid == TID_ERROR){
+        free(data);
+        return TID_ERROR;
+    }
 
     child = list_entry(list_back(&thread_current()->child_list), struct thread, c_elem);
+
     sema_down(&child->fork_sema); 
 
     if(child->exit_status == -1){
@@ -204,7 +203,6 @@ static void __do_fork(void *aux)
 #endif
 
     for (int i = 2; i < 20; i++)
-
     {
         if (parent->fdt[i]){
             current->fdt[i] = file_duplicate(parent->fdt[i]);
@@ -248,8 +246,8 @@ int process_exec(void *f_name)
     success = load(file_name, &_if);
 
     // 5. 실패 시 처리
-    if (!success) { 
-        palloc_free_page(file_name);
+    if (!success){
+        // palloc_free_page(file_name);
         return -1;
     } 
     palloc_free_page(file_name);
@@ -303,6 +301,7 @@ void process_exit(void)
     struct thread *curr = thread_current();
     struct elem * e;
     /* Close all open file descriptors. */
+
     
     if (curr->pml4 != NULL)
         printf("%s: exit(%d)\n", curr->name, curr->exit_status);
@@ -310,10 +309,10 @@ void process_exit(void)
         
     for (int fd = 2; fd < 20; fd++)
     {
-        if (cur->fdt[fd] != NULL)
+        if (curr->fdt[fd] != NULL)
         {
-            file_close(cur->fdt[fd]);
-            cur->fdt[fd] = NULL;
+            file_close(curr->fdt[fd]);
+            curr->fdt[fd] = NULL;
         }
     }
     free (curr->fdt);
