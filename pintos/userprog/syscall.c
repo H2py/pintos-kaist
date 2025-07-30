@@ -178,6 +178,7 @@ tid_t exec(const char *cmd_line)
     if(file_copy == NULL) return -1;
     
     strlcpy(file_copy, cmd_line, PGSIZE);
+
     result = process_exec(file_copy);
     
     palloc_free_page(file_copy);

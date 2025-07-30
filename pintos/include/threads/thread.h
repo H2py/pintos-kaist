@@ -110,7 +110,6 @@ struct thread {
 	/* child와 관련된 스레드 변수 및 구조체*/
 	struct list child_list;			    /* 직계 자손을 담을 child_list*/
 	struct list_elem c_elem;
-	struct thread * child;
 	int exit_status; 					/* child process의 exit_status*/
 	struct semaphore wait_sema; 		/* 부모 대기, 자식이 신호 보내는 세마포어*/
 	struct semaphore fork_sema;

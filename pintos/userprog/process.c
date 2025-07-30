@@ -58,19 +58,25 @@ tid_t process_create_initd(const char *file_name)
 
     /* Create a new thread to execute FILE_NAME. */
     tid = thread_create(file_token, PRI_DEFAULT, initd, fn_copy);
-    if (tid == TID_ERROR) palloc_free_page(fn_copy);
-    // palloc_free_page(fn_copy); // TODO : Check
+    if (tid == TID_ERROR){
+        palloc_free_page(fn_copy);
+        return TID_ERROR;
+    } 
 
-    for (e = list_begin(&thread_current()->child_list); e != list_end(&thread_current()->child_list); e = list_next(e))
-    {
+    e = list_begin(&thread_current()->child_list);
+    while(e != list_end(&thread_current()->child_list)){
         child = list_entry(e, struct thread, c_elem);
-        if (tid == child->tid) break;
+        if (tid == child->tid){
+            sema_down(&child->exec_sema);
+            remove(e);
+            return tid;
+        }
+        e = list_next(e);
     }
 
-    sema_down(&child->exec_sema);
-    remove(e);
+    palloc_free_page(fn_copy); // TODO : Check
 
-    return tid;
+    return TID_ERROR;
 }
 
 /* A thread function that launches first user process. */
@@ -94,16 +100,27 @@ tid_t process_fork(const char *name, struct intr_frame *if_)
     struct thread *child;
     struct fork_data *data = malloc(sizeof(struct fork_data));
 
+    if(data == NULL) {        
+        return -1;
+    }
+
     data->parent = thread_current();
     data->if_ptr = if_;
 
     /* Clone current thread to new thread.*/
     child_tid = thread_create(name, PRI_DEFAULT, __do_fork, data);
-    if (child_tid == TID_ERROR) return TID_ERROR;
+    if (child_tid == TID_ERROR){
+        free(data);
+        return TID_ERROR;
+    }
 
     child = list_entry(list_back(&thread_current()->child_list), struct thread, c_elem);
 
     sema_down(&child->fork_sema); 
+
+    if(child->exit_status == -1){
+        return child->exit_status;
+    }
 
     return child_tid;
 }
@@ -130,7 +147,11 @@ static bool duplicate_pte(uint64_t *pte, void *va, void *aux)
     newpage = palloc_get_page(PAL_USER);
     if (newpage == NULL) return false;
 
-    memcpy(newpage, parent_page, PGSIZE);
+    void * temp = memcpy(newpage, parent_page, PGSIZE);
+    if(temp == NULL){
+        palloc_free_page(newpage);
+        return false;
+    } 
     writable = is_writable(pte);
 
     /* 5. Add new page to child's page table at address VA with WRITABLE
@@ -158,7 +179,6 @@ static void __do_fork(void *aux)
     struct thread *parent = fork_aux->parent;
     struct intr_frame *parent_if = fork_aux->if_ptr;
     free(aux);
-
     struct thread *current = thread_current();
     bool succ = true;
 
@@ -178,10 +198,13 @@ static void __do_fork(void *aux)
     if (!pml4_for_each(parent->pml4, duplicate_pte, parent)) goto error;
 #endif
 
-    for (int i = 0; i < 63; i++)
+    for (int i = 3; i < 128; i++)
     {
-        if (parent->fdt[i])
+        if (parent->fdt[i]){
             current->fdt[i] = file_duplicate(parent->fdt[i]);
+            if(current->fdt[i] == NULL) goto error;
+        }
+
     }
 
     process_init();
@@ -195,6 +218,7 @@ static void __do_fork(void *aux)
         do_iret(&if_);
     }
 error:
+    current->exit_status = -1;
     sema_up(&thread_current()->fork_sema);
     thread_exit();
 }
@@ -218,7 +242,10 @@ int process_exec(void *f_name)
     success = load(file_name, &_if);
 
     // 5. 실패 시 처리
-    if (!success) return -1;
+    if (!success){
+        palloc_free_page(file_name);
+        return -1;
+    } 
     palloc_free_page(file_name);
 
     // 6. 새로운 프로세스 시작
@@ -268,6 +295,7 @@ int process_wait(tid_t child_tid)
 void process_exit(void)
 {
     struct thread *curr = thread_current();
+    struct elem * e;
     /* Close all open file descriptors. */
 
     if (curr->pml4 != NULL)
@@ -279,13 +307,19 @@ void process_exit(void)
         curr->running_file = NULL;
     }
 
-    for (int fd = 3; fd < 64; fd++)
+    for (int fd = 3; fd < 128; fd++)
     {
         if (curr->fdt[fd] != NULL)
         {
             file_close(curr->fdt[fd]);
             curr->fdt[fd] = NULL;
         }
+    }
+
+    e = list_begin(&curr->child_list);
+
+    while(!list_empty(&curr->child_list)){
+        e = list_remove(e);
     }
 
     curr->next_fd = 3;
