@@ -9,7 +9,7 @@ tid_t exec(const char *cmd_line);
 int wait(tid_t pid);
 int read(int fd, void *buffer, unsigned size);
 int write(int fd, const void *buffer, unsigned size);
-tid_t fork (const char *thread_name);
+tid_t fork(const char *thread_name, struct intr_frame *if_ );
 unsigned tell (int fd);
 bool create(const char *file, unsigned initial_size);
 int open(const char *file);

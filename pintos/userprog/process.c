@@ -77,7 +77,7 @@ tid_t process_create_initd(const char *file_name)
     
         if (tid == child->tid){
             sema_down(&child->exec_sema);
-            list_remove(e);
+            remove(e);
             return tid;
         }
     
@@ -131,7 +131,7 @@ tid_t process_fork(const char *name, struct intr_frame *if_)
     if(child->exit_status == -1){
         return child->exit_status;
     }
-
+    
     return child_tid;
 }
 
@@ -157,11 +157,7 @@ static bool duplicate_pte(uint64_t *pte, void *va, void *aux)
     newpage = palloc_get_page(PAL_USER);
     if (newpage == NULL) return false;
 
-    void * temp = memcpy(newpage, parent_page, PGSIZE);
-    if(temp == NULL){
-        palloc_free_page(parent_page);
-        return false;
-    }
+    memcpy(newpage, parent_page, PGSIZE);
     writable = is_writable(pte);
 
     /* 5. Add new page to child's page table at address VA with WRITABLE
@@ -170,7 +166,6 @@ static bool duplicate_pte(uint64_t *pte, void *va, void *aux)
     {
         /* 6. TODO: if fail to insert page, do error handling. */
         palloc_free_page(newpage);
-        printf("Duplicate failed to at %p", va);
         return false;
     }
     return true;
@@ -208,14 +203,13 @@ static void __do_fork(void *aux)
     if (!pml4_for_each(parent->pml4, duplicate_pte, parent)) goto error;
 #endif
 
-    for (int i = 0; i < 128; i++)
+    for (int i = 2; i < 20; i++)
 
     {
         if (parent->fdt[i]){
             current->fdt[i] = file_duplicate(parent->fdt[i]);
-            // if(current->fdt[i] == NULL) goto error;
+            // printf("%d\n",i);
         }
-
     }
 
     process_init();
@@ -232,6 +226,7 @@ error:
     current->exit_status = -1;
     sema_up(&thread_current()->fork_sema);
     thread_exit();
+    // exit(-1);
 }
 
 int process_exec(void *f_name)
@@ -308,19 +303,12 @@ void process_exit(void)
     struct thread *curr = thread_current();
     struct elem * e;
     /* Close all open file descriptors. */
-
-    if (cur->pml4 != NULL)
-        printf("%s: exit(%d)\n", cur->name, cur->exit_status);
-
-    process_cleanup();
-    if (cur->running_file)
-    {
-        file_close(cur->running_file);
-        cur->running_file = NULL;
-    }
-
-
-    for (int fd = 2; fd < 128; fd++)
+    
+    if (curr->pml4 != NULL)
+        printf("%s: exit(%d)\n", curr->name, curr->exit_status);
+    
+        
+    for (int fd = 2; fd < 20; fd++)
     {
         if (cur->fdt[fd] != NULL)
         {
@@ -328,21 +316,27 @@ void process_exit(void)
             cur->fdt[fd] = NULL;
         }
     }
-    palloc_free_multiple(curr->fdt,FDT_DEFAULT);
-
+    free (curr->fdt);
+    
+    
+    e = list_begin(&curr->child_list);
     while(!list_empty(&curr->child_list)){
-        e = list_begin(&curr->child_list);
-        list_remove(e);
+        e = list_remove(e);
     }
-
-    palloc_free_multiple(cur->fdt, FDT_DEFAULT);
+    
     curr->next_fd = 2;
-
-
-    cur->next_fd = 3;
-
-    sema_up(&cur->wait_sema);
-    sema_down(&cur->exit_sema);
+    
+    
+    if (curr->running_file)
+    {
+        file_close(curr->running_file);
+        curr->running_file = NULL;
+    }
+    
+    process_cleanup();
+    
+    sema_up(&curr->wait_sema);
+    sema_down(&curr->exit_sema);
 }
 
 /* Free the current process's resources. */
@@ -497,6 +491,9 @@ static bool load(const char *file_name, struct intr_frame *if_)
 	file_deny_write(file);
 
 	struct file *dup_file = file_duplicate(file);
+    if(dup_file == NULL){
+        goto done;
+    }
 	t->running_file = dup_file;
 
 

@@ -13,6 +13,7 @@
 #include "threads/palloc.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include "threads/malloc.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -201,11 +202,15 @@ tid_t thread_create(const char *name, int priority, thread_func *function,
 
     /* Initialize thread. */
     init_thread(t, name, priority);
-    t->fdt = palloc_get_multiple(PAL_ZERO,FDT_DEFAULT);
+    
+    // palloc_get_multiple(PAL_ZERO,FDT_DEFAULT);
 
-    if (t->fdt == NULL) return TID_ERROR;
+
     
     tid = t->tid = allocate_tid();
+
+    t->fdt = calloc (20, sizeof *t->fdt);
+    if (t->fdt == NULL) return TID_ERROR;
 
     // 부모 - 자식 매핑
     list_push_back(&thread_current()->child_list, &t->c_elem);
