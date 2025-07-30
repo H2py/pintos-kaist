@@ -33,14 +33,6 @@ static void __do_fork(void *);
 static void process_init(void)
 {
     struct thread *current = thread_current();
-    // 향후 추가될 수 있는 초기화 작업들:
-    // 1. 프로세스별 데이터 구조 초기화
-    // 2. 시그널 핸들러 설정
-    // 3. 환경 변수 설정
-    // 4. 파일 디스크립터 테이블 초기화
-    // 5. 프로세스별 설정 로드
-    // 6. 보안 컨텍스트 초기화
-    // 7. 프로세스별 통계 초기화
 }
 
 /* Starts the first userland program, called "initd", loaded from FILE_NAME.
@@ -52,36 +44,29 @@ tid_t process_create_initd(const char *file_name)
 {
     char *fn_copy;
     tid_t tid;
-    char *file_token;  // FIX file_token 변수 : 스레드 생성 시 스레드명을
-                       // 파일명으로 동일하게 넣어주기 위한 token 변수
+    char *file_token;  
     char *save_ptr;
     struct list_elem *e;
     struct thread *child;
+
     /* Make a copy of FILE_NAME.
      * Otherwise there's a race between the caller and load(). */
-
     fn_copy = palloc_get_page(0);  // 실행 파일을 위한 메모리 생성 (memset)
-
     if (fn_copy == NULL) return TID_ERROR;
-    strlcpy(fn_copy, file_name,
-            PGSIZE);  // page size - 1(=4KB) 만큼 문자 복사 후 dest 끝에 \n 문자
-                      // 자동으로 붙임. flie_name -> fn_copy
-
+    strlcpy(fn_copy, file_name, PGSIZE);  // page size - 1(=4KB) 만큼 문자 복사 후 dest 끝에 \n 문자
     file_token = strtok_r(file_name, " ", &save_ptr);
 
     /* Create a new thread to execute FILE_NAME. */
     tid = thread_create(file_token, PRI_DEFAULT, initd, fn_copy);
     if (tid == TID_ERROR) palloc_free_page(fn_copy);
+    // palloc_free_page(fn_copy); // TODO : Check
 
-    for (e = list_begin(&thread_current()->child_list);
-         e != list_end(&thread_current()->child_list); e = list_next(e))
+    for (e = list_begin(&thread_current()->child_list); e != list_end(&thread_current()->child_list); e = list_next(e))
     {
         child = list_entry(e, struct thread, c_elem);
-        if (tid == child->tid)
-        {
-            break;
-        }
+        if (tid == child->tid) break;
     }
+
     sema_down(&child->exec_sema);
     remove(e);
 
@@ -113,15 +98,12 @@ tid_t process_fork(const char *name, struct intr_frame *if_)
     data->if_ptr = if_;
 
     /* Clone current thread to new thread.*/
-    child_tid = 
-            thread_create(name, PRI_DEFAULT, __do_fork, data);
-
+    child_tid = thread_create(name, PRI_DEFAULT, __do_fork, data);
     if (child_tid == TID_ERROR) return TID_ERROR;
 
-    child = list_entry(list_back(&thread_current()->child_list), struct thread,
-                       c_elem);
+    child = list_entry(list_back(&thread_current()->child_list), struct thread, c_elem);
 
-    sema_down(&child->fork_sema);  // child으ㅣ fork sema로 변경
+    sema_down(&child->fork_sema); 
 
     return child_tid;
 }
@@ -138,19 +120,14 @@ static bool duplicate_pte(uint64_t *pte, void *va, void *aux)
     bool writable;
 
     /* 1. TODO: If the parent_page is kernel page, then return immediately. */
-    // if(is_kern_pte(pte)) return true;
     if (is_kernel_vaddr(va) || is_kern_pte(pte)) return true;
 
     /* 2. Resolve VA from the parent's page map level 4. */
-    parent_page = pml4_get_page(
-        parent->pml4,
-        va);  // parent의 pml4d에서 가상 메모리랑 대응되는 물리 주소를 가져온다
+    parent_page = pml4_get_page(parent->pml4, va);  // parent의 pml4d에서 가상 메모리랑 대응되는 물리 주소를 가져온다
     if (parent_page == NULL) return false;
 
-    /* 3. TODO: Allocate new PAL_USER page for the child and set result to
-     * NEWPAGE */
+    /* 3. TODO: Allocate new PAL_USER page for the child and set result to NEWPAGE */
     newpage = palloc_get_page(PAL_USER);
-
     if (newpage == NULL) return false;
 
     memcpy(newpage, parent_page, PGSIZE);
@@ -183,7 +160,6 @@ static void __do_fork(void *aux)
     free(aux);
 
     struct thread *current = thread_current();
-    /* somehow pass the parent_if. (i.e. process_fork()'s if_) */
     bool succ = true;
 
     /* 1. Read the cpu context to local stack. */
@@ -205,9 +181,7 @@ static void __do_fork(void *aux)
     for (int i = 0; i < 63; i++)
     {
         if (parent->fdt[i])
-        {
             current->fdt[i] = file_duplicate(parent->fdt[i]);
-        }
     }
 
     process_init();
@@ -269,17 +243,13 @@ int process_wait(tid_t child_tid)
     struct thread *parent = thread_current();
     int child_exit_status = -1;
 
-    for (e = list_begin(&parent->child_list);
-         e != list_end(&parent->child_list); e = list_next(e))
+    for (e = list_begin(&parent->child_list); e != list_end(&parent->child_list); e = list_next(e))
     {
         child = list_entry(e, struct thread, c_elem);
         if (child_tid == child->tid)
         {
             if (child->is_waited)
-            {
-
                 return child_exit_status;
-            }
             else
             {
                 child->is_waited = true;
@@ -357,8 +327,7 @@ static void process_cleanup(void)
 /* Sets up the CPU for running user code in the nest thread.
  * This function is called on every context switch. */
 void process_activate(struct thread *next)
-{  // 왜 next일까? -> // 현재 스레드에서 다음 스레드로 전환
-   // process_activate(next);  "다음" 스레드를 활성화
+{   // 왜 next일까? -> // 현재 스레드에서 다음 스레드로 전환 즉, process_activate(next);  "다음" 스레드를 활성화
     /* Activate thread's page tables. */
     pml4_activate(next->pml4);
 
@@ -434,7 +403,6 @@ static bool load_segment(struct file *file, off_t ofs, uint8_t *upage,
 static bool load(const char *file_name, struct intr_frame *if_)
 {
     lock_acquire(&global_lock); 
-    // FIX 고정 크기 매개변수 배열 생성
     static char *argv_addrs[LOADER_ARGS_LEN / 2 + 1];
     static char *argv[LOADER_ARGS_LEN / 2 + 1];
 
@@ -479,10 +447,7 @@ static bool load(const char *file_name, struct intr_frame *if_)
 
 	file_deny_write(file);
 
-    
 	struct file *dup_file = file_duplicate(file);
-    
-
 	t->running_file = dup_file;
 
 
@@ -727,17 +692,12 @@ static bool setup_stack(struct intr_frame *if_)
     uint8_t *kpage;
     bool success = false;
 
-    kpage = palloc_get_page(
-        PAL_USER | PAL_ZERO);  // 물리 메모리에서 4KB 페이지 할당 0으로 초기화
+    kpage = palloc_get_page(PAL_USER | PAL_ZERO);  // 물리 메모리에서 4KB 페이지 할당 0으로 초기화
     if (kpage != NULL)
     {
-        success = install_page(
-            ((uint8_t *) USER_STACK) - PGSIZE, kpage,
-            true);    // USER_STACK 주소에서 - 페이지 크기 => 스택의 맨 아래
-                      // 페이지 주소(스택은 밑으로 성장하니까)
+        success = install_page(((uint8_t *) USER_STACK) - PGSIZE, kpage,true);    // USER_STACK 주소에서 - 페이지 크기 => 스택의 맨 아래
         if (success)  // kpage에 가상 주소 USER_SATCK - PGSIZE <-> 물리주소 매핑
-            if_->rsp = USER_STACK;  // 페이지 할당되면, rsp(스택 포인터)가
-                                    // USER_STACK 주소를 가리킴
+            if_->rsp = USER_STACK;  // 페이지 할당되면, rsp(스택 포인터)가 USER_STACK 주소를 가리킴
         else
             palloc_free_page(kpage);
     }
