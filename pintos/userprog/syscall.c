@@ -57,7 +57,7 @@ void syscall_handler(struct intr_frame *f)
             halt();
             break;
         case SYS_EXIT:
-            exit(f->R.rdi);  // status 숫자를 뭘 넣어줘야 하는거지?
+            exit(f->R.rdi);  //status 숫자를 뭘 넣어줘야 하는거지?
             break;
         case SYS_FORK:
             f->R.rax = fork(f->R.rdi);
@@ -137,7 +137,7 @@ int open(const char *file)
 
     if (f == NULL) return -1;
 
-    for (int fd = 3; fd < 63; fd++) {
+    for (int fd = 3; fd < 128; fd++) {
         if (cur->fdt[fd] == NULL)
         {
             cur->fdt[fd] = f;
@@ -260,6 +260,6 @@ static bool is_valid_pointer(void *ptr)
 
 struct file *get_file_by_fd(int fd)
 {
-    if (fd < 0 || fd > 63 || (thread_current()->fdt[fd] == NULL)) return NULL;
+    if (fd < 0 || fd > 128 || (thread_current()->fdt[fd] == NULL)) return NULL;
     return thread_current()->fdt[fd];
 }

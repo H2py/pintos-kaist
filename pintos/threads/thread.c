@@ -465,7 +465,7 @@ static void init_thread(struct thread *t, const char *name, int priority)
     // t->fdt = palloc_get_multiple(PAL_ZERO, FDT_DEFAULT);
 
     // if (t->fdt == NULL) return TID_ERROR;
-    for(int i =3;i<64;i++){
+    for(int i =3;i<128;i++){
         t->fdt[i] = NULL;
     }
     t->next_fd = 3;  // 다음 파일 디스크립터 번호를 3으로 초기화
