@@ -211,7 +211,7 @@ static void __do_fork(void *aux)
     {
         if (parent->fdt[i]){
             current->fdt[i] = file_duplicate(parent->fdt[i]);
-            if(current->fdt[i] == NULL) goto error;
+            // if(current->fdt[i] == NULL) goto error;
         }
 
     }
@@ -324,7 +324,7 @@ void process_exit(void)
             curr->fdt[fd] = NULL;
         }
     }
-
+    palloc_free_multiple(curr->fdt,FDT_DEFAULT);
 
     while(!list_empty(&curr->child_list)){
         e = list_begin(&curr->child_list);
