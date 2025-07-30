@@ -468,7 +468,7 @@ static void init_thread(struct thread *t, const char *name, int priority)
     for(int i =3;i<128;i++){
         t->fdt[i] = NULL;
     }
-    t->next_fd = 3;  // 다음 파일 디스크립터 번호를 3으로 초기화
+    t->next_fd = 2;  // 다음 파일 디스크립터 번호를 3으로 초기화
 
     t->running_file = NULL;
     t->parent = NULL;

@@ -137,7 +137,7 @@ int open(const char *file)
 
     if (f == NULL) return -1;
 
-    for (int fd = 3; fd < 128; fd++) {
+    for (int fd = 2; fd < 128; fd++) {
         if (cur->fdt[fd] == NULL)
         {
             cur->fdt[fd] = f;

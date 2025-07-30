@@ -52,25 +52,33 @@ tid_t process_create_initd(const char *file_name)
     /* Make a copy of FILE_NAME.
      * Otherwise there's a race between the caller and load(). */
     fn_copy = palloc_get_page(0);  // 실행 파일을 위한 메모리 생성 (memset)
+    
     if (fn_copy == NULL) return TID_ERROR;
+
     strlcpy(fn_copy, file_name, PGSIZE);  // page size - 1(=4KB) 만큼 문자 복사 후 dest 끝에 \n 문자
+    
     file_token = strtok_r(file_name, " ", &save_ptr);
 
     /* Create a new thread to execute FILE_NAME. */
     tid = thread_create(file_token, PRI_DEFAULT, initd, fn_copy);
+
     if (tid == TID_ERROR){
         palloc_free_page(fn_copy);
         return TID_ERROR;
     } 
 
     e = list_begin(&thread_current()->child_list);
+    
     while(e != list_end(&thread_current()->child_list)){
+    
         child = list_entry(e, struct thread, c_elem);
+    
         if (tid == child->tid){
             sema_down(&child->exec_sema);
             remove(e);
             return tid;
         }
+    
         e = list_next(e);
     }
 
@@ -109,6 +117,7 @@ tid_t process_fork(const char *name, struct intr_frame *if_)
 
     /* Clone current thread to new thread.*/
     child_tid = thread_create(name, PRI_DEFAULT, __do_fork, data);
+
     if (child_tid == TID_ERROR){
         free(data);
         return TID_ERROR;
@@ -149,9 +158,9 @@ static bool duplicate_pte(uint64_t *pte, void *va, void *aux)
 
     void * temp = memcpy(newpage, parent_page, PGSIZE);
     if(temp == NULL){
-        palloc_free_page(newpage);
+        palloc_free_page(parent_page);
         return false;
-    } 
+    }
     writable = is_writable(pte);
 
     /* 5. Add new page to child's page table at address VA with WRITABLE
@@ -198,7 +207,7 @@ static void __do_fork(void *aux)
     if (!pml4_for_each(parent->pml4, duplicate_pte, parent)) goto error;
 #endif
 
-    for (int i = 3; i < 128; i++)
+    for (int i = 2; i < 128; i++)
     {
         if (parent->fdt[i]){
             current->fdt[i] = file_duplicate(parent->fdt[i]);
@@ -243,7 +252,7 @@ int process_exec(void *f_name)
 
     // 5. 실패 시 처리
     if (!success){
-        palloc_free_page(file_name);
+        // palloc_free_page(file_name);
         return -1;
     } 
     palloc_free_page(file_name);
@@ -307,7 +316,7 @@ void process_exit(void)
         curr->running_file = NULL;
     }
 
-    for (int fd = 3; fd < 128; fd++)
+    for (int fd = 2; fd < 128; fd++)
     {
         if (curr->fdt[fd] != NULL)
         {
@@ -316,13 +325,13 @@ void process_exit(void)
         }
     }
 
-    e = list_begin(&curr->child_list);
 
     while(!list_empty(&curr->child_list)){
-        e = list_remove(e);
+        e = list_begin(&curr->child_list);
+        list_remove(e);
     }
 
-    curr->next_fd = 3;
+    curr->next_fd = 2;
 
     sema_up(&curr->wait_sema);
     sema_down(&curr->exit_sema);
