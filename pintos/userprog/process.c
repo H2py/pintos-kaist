@@ -68,7 +68,7 @@ tid_t process_create_initd(const char *file_name)
         child = list_entry(e, struct thread, c_elem);
         if (tid == child->tid){
             sema_down(&child->exec_sema);
-            remove(e);
+            list_remove(e);
             return tid;
         }
         e = list_next(e);
