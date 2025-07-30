@@ -18,8 +18,6 @@
 struct lock global_lock;
 void syscall_entry(void);
 void syscall_handler(struct intr_frame *);
-static int64_t get_user(const uint8_t *uaddr);
-static bool put_user(uint8_t *udst, uint8_t byte);
 
 /* System call.
  *
@@ -46,8 +44,7 @@ void syscall_init(void)
     /* The interrupt service rountine should not serve any interrupts
      * until the syscall_entry swaps the userland stack to the kernel
      * mode stack. Therefore, we masked the FLAG_FL. */
-    write_msr(MSR_SYSCALL_MASK,
-              FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);	
+    write_msr(MSR_SYSCALL_MASK, FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);	
 }
 
 /* The main system call interface */
@@ -63,14 +60,7 @@ void syscall_handler(struct intr_frame *f)
             exit(f->R.rdi);  // status 숫자를 뭘 넣어줘야 하는거지?
             break;
         case SYS_FORK:
-            if (is_valid_pointer(f->R.rdi))
-            {
-                f->R.rax = fork(f->R.rdi);
-            }
-            else
-            {
-                exit(-1);
-            }
+            f->R.rax = fork(f->R.rdi);
             break;
         case SYS_EXEC:
             f->R.rax = exec(f->R.rdi);
@@ -137,89 +127,61 @@ bool remove(const char *file)
 
 int open(const char *file)
 {
-    int ret = -1;
     struct thread *cur = thread_current();
 
-    if (!is_valid_pointer(file))
-    {
-        exit(-1);
-        return ret;
-    }
+    if (!is_valid_pointer(file)) exit(-1);
 
     lock_acquire(&global_lock);
     struct file *f = filesys_open(file);
     lock_release(&global_lock);
 
-    if (f == NULL)
-    {
-        cur->exit_status = -1;
-        return ret;
-    }
-    else
-    {
-        for (int fd = 3; fd < 63; fd++)
+    if (f == NULL) return -1;
+
+    for (int fd = 3; fd < 63; fd++) {
+        if (cur->fdt[fd] == NULL)
         {
-            if (get_file_by_fd(fd) == NULL)
-            {
-                cur->next_fd = fd;
-                ret = fd;
-                cur->fdt[cur->next_fd] = f;
-                break;
-            }
+            cur->fdt[fd] = f;
+            cur->next_fd = fd;
+            return fd;
         }
     }
-    return ret;
+
+    file_close(f);
+    return -1;
 }
 
 int filesize(int fd)
 {
-    if (get_file_by_fd(fd) == NULL)
-    {
-    }
     return file_length(get_file_by_fd(fd));
 }
 
 void exit(int status)
 {
-    struct thread *cur = thread_current();
-    cur->exit_status = status;  // exit_status 와 thread의 Status는 다르다.
+    thread_current()->exit_status = status; 
     thread_exit();
 }
 
 tid_t fork(const char *thread_name)
 {
-    tid_t pid;
+    struct intr_frame *if_ = pg_round_up(&thread_name) - sizeof(struct intr_frame);
 
-    struct intr_frame *if_ =
-        pg_round_up(&thread_name) - sizeof(struct intr_frame);
-
-    pid = process_fork(thread_name, if_);
-    return pid;
+    return process_fork(thread_name, if_);
 }
 
 /* Create child process and execute program correspond to cmd_line on it*/
 tid_t exec(const char *cmd_line)
 {
-    int result;
-    if (!is_valid_pointer(cmd_line))
-    {
-        exit(-1);
-    }
+    tid_t result;
+    if (!is_valid_pointer(cmd_line)) exit(-1);
 
     char *file_copy = palloc_get_page(PAL_ZERO);
-    if (file_copy)
-    {
-        strlcpy(file_copy, cmd_line, PGSIZE);
-
-        result = process_exec(file_copy);
-
-        // if (file_copy) palloc_free_page(file_copy);
-
-        return result;
-    }
-	else{
-		return -1;
-	}
+    if(file_copy == NULL) return -1;
+    
+    strlcpy(file_copy, cmd_line, PGSIZE);
+    result = process_exec(file_copy);
+    
+    palloc_free_page(file_copy);
+    return result;
 }
 
 /* 자식 프로세스가 종료되기를 기다리고, 자식의 종료 상태를 반환*/
@@ -232,81 +194,49 @@ int wait(tid_t pid)
 
 int read(int fd, void *buffer, unsigned size)
 {
-    if (fd < 0 || fd > 63) return -1;
-
-    struct thread *cur = thread_current();
-    struct file *file = cur->fdt[fd]; /* 읽어 올 file 가져오기 */
-    if (file == NULL) return -1;
-
     if (fd == 0)
     { 
         for (int i = 0; i < size; i++) ((uint8_t *) buffer)[i] = input_getc();
         return size;
     }
-    else
-    {	
-		lock_acquire(&global_lock);
-        int bytes_read = file_read(file, buffer, size);
-		lock_release(&global_lock);
 
-        if (bytes_read < 0)
-            return -1;
-        else if (bytes_read == 0)
-            return 0;
-        return bytes_read;
-    }
+    struct file *file = get_file_by_fd(fd);
+    if (file == NULL) return -1;
+    	
+	lock_acquire(&global_lock);
+    int bytes_read = file_read(file, buffer, size);
+	lock_release(&global_lock);
+
+    return (bytes_read < 0 ) ? -1 : bytes_read;
+
 }
 
 int write(int fd, const void *buffer, unsigned size)
 {
-    struct thread *cur = thread_current();
-    struct file *file = cur->fdt[fd];
-
-    if (fd < 0 || fd > 63)
-    {
-        cur->exit_status = -1;
-        return -1;
-    }
-
     if (fd == 1)
     {
         putbuf(buffer, size);
         return size;
     }
 
-    if (file == NULL)
-    {
-        cur->exit_status = -1;
-        return -1;
-    }
+    struct file *file = get_file_by_fd(fd);
+    if (file == NULL) return -1;
 
     lock_acquire(&global_lock);
     int byte_write = file_write(file, buffer, size);
     lock_release(&global_lock);
 
-    if (byte_write < 0)
-    {
-        cur->exit_status = -1;
-        return -1;
-    }
-
-    return byte_write;
+    return (byte_write < 0) ? -1 : byte_write;
 }
 
-/* Fix */
 void close(int fd)
 {
     struct thread *cur = thread_current();
     struct file *target;
 
-    if ((target = get_file_by_fd(fd)) == NULL)
-    {
-        cur->exit_status = -1;
-        return;
-    }
+    if ((target = get_file_by_fd(fd)) == NULL) return;
 
     file_close(target);
-
     cur->fdt[fd] = NULL;
 
     if (fd == cur->next_fd - 1) cur->next_fd--;
@@ -324,53 +254,12 @@ void seek(int fd, unsigned position)
 
 static bool is_valid_pointer(void *ptr)
 {
-    struct thread *cur = thread_current();
-    if (ptr == NULL) return false;
-    if (is_kernel_vaddr(ptr)) return false;
-    if (!pml4_get_page(cur->pml4, ptr))
-        return false;  // 현재 프로세스의 페이지 테이블에서 ptr이 가리키는
-                       // 페이지가 존재하는지 확인
-
+    if (ptr == NULL || is_kernel_vaddr(ptr) || !pml4_get_page(thread_current()->pml4, ptr)) return false;
     return true;
 }
 
 struct file *get_file_by_fd(int fd)
 {
-    if (fd < 0 || fd > 63) return NULL;
-    struct thread *cur = thread_current();
-
-    if (cur->fdt[fd] == NULL) return NULL;
-
-    return cur->fdt[fd];
-}
-
-/* Reads a byte at user virtual address UADDR.
- * UADDR must be below KERN_BASE.
- * Returns the byte value if successful, -1 if a segfault
- * occurred. */
-static int64_t get_user(const uint8_t *uaddr)
-{
-    int64_t result;
-    __asm __volatile(
-        "movabsq $done_get, %0\n"
-        "movzbq %1, %0\n"
-        "done_get:\n"
-        : "=&a"(result)
-        : "m"(*uaddr));
-    return result;
-}
-
-/* Writes BYTE to user address UDST.
- * UDST must be below KERN_BASE.
- * Returns true if successful, false if a segfault occurred. */
-static bool put_user(uint8_t *udst, uint8_t byte)
-{
-    int64_t error_code;
-    __asm __volatile(
-        "movabsq $done_put, %0\n"
-        "movb %b2, %1\n"
-        "done_put:\n"
-        : "=&a"(error_code), "=m"(*udst)
-        : "q"(byte));
-    return error_code != -1;
+    if (fd < 0 || fd > 63 || (thread_current()->fdt[fd] == NULL)) return NULL;
+    return thread_current()->fdt[fd];
 }
