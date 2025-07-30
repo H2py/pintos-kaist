@@ -137,6 +137,7 @@ int open(const char *file)
 
     if (f == NULL) return -1;
 
+
     for (int fd = 2; fd < 128; fd++) {
         if (cur->fdt[fd] == NULL)
         {
@@ -164,7 +165,6 @@ void exit(int status)
 tid_t fork(const char *thread_name)
 {
     struct intr_frame *if_ = pg_round_up(&thread_name) - sizeof(struct intr_frame);
-
     return process_fork(thread_name, if_);
 }
 
@@ -261,6 +261,6 @@ static bool is_valid_pointer(void *ptr)
 
 struct file *get_file_by_fd(int fd)
 {
-    if (fd < 0 || fd > 128 || (thread_current()->fdt[fd] == NULL)) return NULL;
+    if (fd < 0 || fd >= 128 || (thread_current()->fdt[fd] == NULL)) return NULL;
     return thread_current()->fdt[fd];
 }

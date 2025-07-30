@@ -221,6 +221,15 @@ tid_t thread_create(const char *name, int priority, thread_func *function,
     t->tf.cs = SEL_KCSEG;
     t->tf.eflags = FLAG_IF;
 
+    t->fdt = palloc_get_multiple(PAL_ZERO, FDT_DEFAULT);
+    if (t->fdt == NULL) return TID_ERROR;
+    
+    t->next_fd = 3;  // 다음 파일 디스크립터 번호를 3으로 초기화
+
+    t->running_file = NULL;
+    t->child = NULL;
+    t->parent = NULL;
+
     /* Add to run queue. */
     thread_unblock(t);
     yield_to_higher_priority();
@@ -467,16 +476,14 @@ static void init_thread(struct thread *t, const char *name, int priority)
     t->wait_on_lock = NULL;
     list_init(&t->donor_list);
 
-    // for(int i =3;i<128;i++){
-    //     t->fdt[i] = NULL;
-    // }
+
     t->next_fd = 2;  // 다음 파일 디스크립터 번호를 3으로 초기화
 
     t->running_file = NULL;
     t->parent = NULL;
 
-	list_init(&t->child_list);
-	sema_init(&t->wait_sema, 0);
+	  list_init(&t->child_list);
+	  sema_init(&t->wait_sema, 0);
   	sema_init(&t->fork_sema, 0);
   	sema_init(&t->exit_sema, 0);
   	sema_init(&t->exec_sema, 0);

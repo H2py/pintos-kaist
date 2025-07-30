@@ -61,6 +61,8 @@ tid_t process_create_initd(const char *file_name)
 
     /* Create a new thread to execute FILE_NAME. */
     tid = thread_create(file_token, PRI_DEFAULT, initd, fn_copy);
+    if (tid == TID_ERROR) palloc_free_page(fn_copy);
+
 
     if (tid == TID_ERROR){
         palloc_free_page(fn_copy);
@@ -117,14 +119,13 @@ tid_t process_fork(const char *name, struct intr_frame *if_)
 
     /* Clone current thread to new thread.*/
     child_tid = thread_create(name, PRI_DEFAULT, __do_fork, data);
-
-    if (child_tid == TID_ERROR){
-        free(data);
-        return TID_ERROR;
-    }
+    if (child_tid == TID_ERROR) 
+    {
+        free(data);   
+        return TID_ERROR; 
+    } 
 
     child = list_entry(list_back(&thread_current()->child_list), struct thread, c_elem);
-
     sema_down(&child->fork_sema); 
 
     if(child->exit_status == -1){
@@ -207,7 +208,8 @@ static void __do_fork(void *aux)
     if (!pml4_for_each(parent->pml4, duplicate_pte, parent)) goto error;
 #endif
 
-    for (int i = 2; i < 128; i++)
+    for (int i = 0; i < 128; i++)
+
     {
         if (parent->fdt[i]){
             current->fdt[i] = file_duplicate(parent->fdt[i]);
@@ -251,8 +253,8 @@ int process_exec(void *f_name)
     success = load(file_name, &_if);
 
     // 5. 실패 시 처리
-    if (!success){
-        // palloc_free_page(file_name);
+    if (!success) { 
+        palloc_free_page(file_name);
         return -1;
     } 
     palloc_free_page(file_name);
@@ -307,21 +309,23 @@ void process_exit(void)
     struct elem * e;
     /* Close all open file descriptors. */
 
-    if (curr->pml4 != NULL)
-        printf("%s: exit(%d)\n", curr->name, curr->exit_status);
+    if (cur->pml4 != NULL)
+        printf("%s: exit(%d)\n", cur->name, cur->exit_status);
 
-    if (curr->running_file)
+    process_cleanup();
+    if (cur->running_file)
     {
-        file_close(curr->running_file);
-        curr->running_file = NULL;
+        file_close(cur->running_file);
+        cur->running_file = NULL;
     }
+
 
     for (int fd = 2; fd < 128; fd++)
     {
-        if (curr->fdt[fd] != NULL)
+        if (cur->fdt[fd] != NULL)
         {
-            file_close(curr->fdt[fd]);
-            curr->fdt[fd] = NULL;
+            file_close(cur->fdt[fd]);
+            cur->fdt[fd] = NULL;
         }
     }
     palloc_free_multiple(curr->fdt,FDT_DEFAULT);
@@ -331,12 +335,14 @@ void process_exit(void)
         list_remove(e);
     }
 
+    palloc_free_multiple(cur->fdt, FDT_DEFAULT);
     curr->next_fd = 2;
 
-    sema_up(&curr->wait_sema);
-    sema_down(&curr->exit_sema);
 
-    process_cleanup();
+    cur->next_fd = 3;
+
+    sema_up(&cur->wait_sema);
+    sema_down(&cur->exit_sema);
 }
 
 /* Free the current process's resources. */
