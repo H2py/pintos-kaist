@@ -141,7 +141,6 @@ int open(const char *file)
         if (cur->fdt[fd] == NULL)
         {
             cur->fdt[fd] = f;
-            cur->next_fd = fd;
             return fd;
         }
     }
@@ -182,6 +181,7 @@ tid_t exec(const char *cmd_line)
     result = process_exec(file_copy);
     
     palloc_free_page(file_copy);
+
     return result;
 }
 
@@ -239,8 +239,6 @@ void close(int fd)
 
     file_close(target);
     cur->fdt[fd] = NULL;
-
-    if (fd == cur->next_fd - 1) cur->next_fd--;
 }
 
 unsigned tell(int fd)
@@ -261,6 +259,6 @@ static bool is_valid_pointer(void *ptr)
 
 struct file *get_file_by_fd(int fd)
 {
-    if (fd < 0 || fd > 128 || (thread_current()->fdt[fd] == NULL)) return NULL;
+    if (fd < 0 || fd >= 128 || (thread_current()->fdt[fd] == NULL)) return NULL;
     return thread_current()->fdt[fd];
 }

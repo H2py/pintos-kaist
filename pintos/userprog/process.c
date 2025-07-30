@@ -211,9 +211,8 @@ static void __do_fork(void *aux)
     {
         if (parent->fdt[i]){
             current->fdt[i] = file_duplicate(parent->fdt[i]);
-            // if(current->fdt[i] == NULL) goto error;
+            // printf("%d\n",i);
         }
-
     }
 
     process_init();
@@ -230,6 +229,7 @@ error:
     current->exit_status = -1;
     sema_up(&thread_current()->fork_sema);
     thread_exit();
+    // exit(-1);
 }
 
 int process_exec(void *f_name)
@@ -491,6 +491,9 @@ static bool load(const char *file_name, struct intr_frame *if_)
 	file_deny_write(file);
 
 	struct file *dup_file = file_duplicate(file);
+    if(dup_file == NULL){
+        goto done;
+    }
 	t->running_file = dup_file;
 
 
