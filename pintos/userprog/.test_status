@@ -24,11 +24,11 @@ alarm-simultaneous PASS
 fork-boundary PASS
 priority-donate-chain PASS
 create-bound PASS
-rox-multichild PASS
+rox-multichild FAIL
 lg-random PASS
 priority-condvar PASS
 priority-donate-nest PASS
-rox-child PASS
+rox-child FAIL
 alarm-single PASS
 read-normal PASS
 priority-donate-multiple2 PASS
@@ -63,7 +63,7 @@ fork-recursive PASS
 open-bad-ptr PASS
 write-normal PASS
 bad-read PASS
-multi-oom PASS
+multi-oom FAIL
 fork-once PASS
 priority-change PASS
 write-boundary PASS
@@ -72,7 +72,7 @@ lg-full PASS
 close-bad-fd PASS
 alarm-negative PASS
 multi-child-fd PASS
-exit FAIL
+exit PASS
 write-bad-ptr PASS
 priority-donate-sema PASS
 lg-seq-block PASS

@@ -32,7 +32,7 @@ void syscall_handler(struct intr_frame *);
 #define MSR_LSTAR 0xc0000082        /* Long mode SYSCALL target */
 #define MSR_SYSCALL_MASK 0xc0000084 /* Mask for the eflags */
 
-static bool is_valid_pointer(void *);
+static void is_valid_pointer(void *);
 
 void syscall_init(void)
 {
@@ -57,43 +57,70 @@ void syscall_handler(struct intr_frame *f)
             halt();
             break;
         case SYS_EXIT:
-            exit(f->R.rdi);  //status 숫자를 뭘 넣어줘야 하는거지?
+            int exit_status = f->R.rdi;
+            exit(exit_status);  //status 숫자를 뭘 넣어줘야 하는거지?
             break;
         case SYS_FORK:
-            f->R.rax = fork(f->R.rdi, f);
+            const char* fork_file_name = f->R.rdi;
+            struct intr_frame *if_ = f;
+            is_valid_pointer(fork_file_name);
+            f->R.rax = fork(f->R.rdi, if_);
             break;
         case SYS_EXEC:
-            f->R.rax = exec(f->R.rdi);
+            const char* exec_file_name = f->R.rdi;
+            is_valid_pointer(exec_file_name);
+            f->R.rax = exec(exec_file_name);
             break;
         case SYS_WAIT:
-            f->R.rax = wait(f->R.rdi);
+            int tid = f->R.rdi;
+            f->R.rax = wait(tid);
             break;
         case SYS_CREATE:
-            f->R.rax = create(f->R.rdi, f->R.rsi);
+            const char* create_file_name = f->R.rdi;
+            unsigned initial_size = f->R.rsi;
+            is_valid_pointer(create_file_name);
+            f->R.rax = create(create_file_name, initial_size);
             break;
         case SYS_REMOVE:
-            f->R.rax = remove(f->R.rdi);
+            const char* remove_file_name = f->R.rdi;
+            is_valid_pointer(remove_file_name);
+            f->R.rax = remove(remove_file_name);
             break;
         case SYS_OPEN:
-            f->R.rax = open(f->R.rdi);
+            const char* open_file_name = f->R.rdi;
+            is_valid_pointer(open_file_name);
+            f->R.rax = open(open_file_name);
             break;
         case SYS_FILESIZE:
-            f->R.rax = filesize(f->R.rdi);
+            int filesize_fd = f->R.rdi;
+            f->R.rax = filesize(filesize_fd);
             break;
         case SYS_READ:
-            f->R.rax = read(f->R.rdi, f->R.rsi, f->R.rdx);
+            int read_fd = f->R.rdi;
+            void* read_buffer = f->R.rsi;
+            unsigned size = f->R.rdx;
+            is_valid_pointer(read_buffer);
+            f->R.rax = read(read_fd, read_buffer, size);
             break;
         case SYS_WRITE:
-            f->R.rax = write(f->R.rdi, f->R.rsi, f->R.rdx);
+            int write_fd = f->R.rdi;
+            void* write_buffer = f->R.rsi;
+            unsigned length = f->R.rdx;
+            is_valid_pointer(write_buffer);
+            f->R.rax = write(write_fd, write_buffer, length);
             break;
         case SYS_SEEK:
-            seek(f->R.rdi, f->R.rsi);
+            int seek_fd = f->R.rdi;
+            unsigned position = f->R.rsi;
+            seek(seek_fd, position);
             break;
         case SYS_TELL:
-            f->R.rax = tell(f->R.rdi);
+            int tell_fd = f->R.rdi;
+            f->R.rax = tell(tell_fd);
             break;
         case SYS_CLOSE:
-            close(f->R.rdi);
+            int close_fd = f->R.rdi;
+            close(close_fd);
             break;
             // projec 3
         case SYS_MMAP:
@@ -113,23 +140,17 @@ void halt(void)
 
 bool create(const char *file, unsigned initial_size)
 {
-    if (file == NULL) exit(-1);
-
     return filesys_create(file, initial_size);
 }
 
 bool remove(const char *file)
 {
-    if (file == NULL) exit(-1);
-
     return filesys_remove(file);
 }
 
 int open(const char *file)
 {
     struct thread *cur = thread_current();
-
-    if (!is_valid_pointer(file)) exit(-1);
 
     lock_acquire(&global_lock);
     struct file *f = filesys_open(file);
@@ -163,7 +184,6 @@ void exit(int status)
 tid_t fork(const char *thread_name, struct intr_frame *if_)
 {
     // struct intr_frame *if_ = pg_round_up(&thread_name) - sizeof(struct intr_frame);
-
     return process_fork(thread_name, if_);
 }
 
@@ -171,13 +191,10 @@ tid_t fork(const char *thread_name, struct intr_frame *if_)
 tid_t exec(const char *cmd_line)
 {
     tid_t result;
-    if (!is_valid_pointer(cmd_line)) exit(-1);
-
     char *file_copy = palloc_get_page(PAL_ZERO);
     if(file_copy == NULL) return -1;
     
     strlcpy(file_copy, cmd_line, PGSIZE);
-
     result = process_exec(file_copy);
     
     palloc_free_page(file_copy);
@@ -208,8 +225,7 @@ int read(int fd, void *buffer, unsigned size)
     int bytes_read = file_read(file, buffer, size);
 	lock_release(&global_lock);
 
-    return (bytes_read < 0 ) ? -1 : bytes_read;
-
+    return bytes_read;
 }
 
 int write(int fd, const void *buffer, unsigned size)
@@ -219,7 +235,7 @@ int write(int fd, const void *buffer, unsigned size)
         putbuf(buffer, size);
         return size;
     }
-
+    
     struct file *file = get_file_by_fd(fd);
     if (file == NULL) return -1;
 
@@ -227,7 +243,7 @@ int write(int fd, const void *buffer, unsigned size)
     int byte_write = file_write(file, buffer, size);
     lock_release(&global_lock);
 
-    return (byte_write < 0) ? -1 : byte_write;
+    return byte_write;
 }
 
 void close(int fd)
@@ -251,10 +267,9 @@ void seek(int fd, unsigned position)
     file_seek(get_file_by_fd(fd), position);
 }
 
-static bool is_valid_pointer(void *ptr)
+static void is_valid_pointer(void *ptr)
 {
-    if (ptr == NULL || is_kernel_vaddr(ptr) || !pml4_get_page(thread_current()->pml4, ptr)) return false;
-    return true;
+    if (ptr == NULL || is_kernel_vaddr(ptr) || !pml4_get_page(thread_current()->pml4, ptr)) exit(-1);
 }
 
 struct file *get_file_by_fd(int fd)

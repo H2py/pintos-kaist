@@ -3,7 +3,7 @@
 
 #include "threads/thread.h"
 
-struct fork_data{
+struct fork_data {
     struct thread * parent;
     struct intr_frame * if_ptr;
 };

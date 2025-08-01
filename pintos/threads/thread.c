@@ -204,8 +204,6 @@ tid_t thread_create(const char *name, int priority, thread_func *function,
     init_thread(t, name, priority);
     
     // palloc_get_multiple(PAL_ZERO,FDT_DEFAULT);
-
-
     
     tid = t->tid = allocate_tid();
 

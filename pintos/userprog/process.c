@@ -70,7 +70,6 @@ tid_t process_create_initd(const char *file_name)
     e = list_begin(&thread_current()->child_list);
     
     while(e != list_end(&thread_current()->child_list)){
-    
         child = list_entry(e, struct thread, c_elem);
     
         if (tid == child->tid){
@@ -107,7 +106,6 @@ tid_t process_fork(const char *name, struct intr_frame *if_)
     tid_t child_tid;
     struct thread *child;
     struct fork_data *data = malloc(sizeof(struct fork_data));
-
     if(data == NULL) {        
         return -1;
     }
@@ -127,7 +125,7 @@ tid_t process_fork(const char *name, struct intr_frame *if_)
 
     sema_down(&child->fork_sema); 
 
-    if(child->exit_status == -1){
+    if(child->exit_status == -1) {
         return child->exit_status;
     }
     
@@ -251,7 +249,7 @@ int process_exec(void *f_name)
         return -1;
     } 
     palloc_free_page(file_name);
-
+    
     // 6. 새로운 프로세스 시작
     sema_up(&thread_current()->exec_sema);
 
@@ -300,12 +298,9 @@ void process_exit(void)
 {
     struct thread *curr = thread_current();
     struct elem * e;
-    /* Close all open file descriptors. */
-
     
     if (curr->pml4 != NULL)
         printf("%s: exit(%d)\n", curr->name, curr->exit_status);
-    
         
     for (int fd = 2; fd < 20; fd++)
     {
@@ -316,15 +311,8 @@ void process_exit(void)
         }
     }
     free (curr->fdt);
-    
-    
-    e = list_begin(&curr->child_list);
-    while(!list_empty(&curr->child_list)){
-        e = list_remove(e);
-    }
-    
+   
     curr->next_fd = 2;
-    
     
     if (curr->running_file)
     {
@@ -336,6 +324,7 @@ void process_exit(void)
     
     sema_up(&curr->wait_sema);
     sema_down(&curr->exit_sema);
+    
 }
 
 /* Free the current process's resources. */
@@ -494,6 +483,7 @@ static bool load(const char *file_name, struct intr_frame *if_)
         goto done;
     }
 	t->running_file = dup_file;
+	// t->running_file = file;
 
 
     /* Read and verify executable header. */
@@ -623,7 +613,7 @@ static bool load(const char *file_name, struct intr_frame *if_)
 done:
     /* We arrive here whether the load is successful or not. */
     lock_release(&global_lock);
-    file_close(file);
+    // file_close(file);
 
     return success;
 }
