@@ -65,6 +65,8 @@ struct page *
 spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
 	struct page *page = NULL;
 	/* TODO: Fill this function. */
+	/* spt에서 va(가상주소)에 대응하는 페이지를 찾는다. */
+	/* 실패시 NULL */
 
 	return page;
 }
@@ -75,6 +77,8 @@ spt_insert_page (struct supplemental_page_table *spt UNUSED,
 		struct page *page UNUSED) {
 	int succ = false;
 	/* TODO: Fill this function. */
+	/* 해당 페이지를 SPT를 삽입 */
+	/* 만약 해당 주소가 존재할 경우 삽입하지 않음 */
 
 	return succ;
 }
@@ -110,12 +114,19 @@ vm_evict_frame (void) {
  * space.*/
 static struct frame *
 vm_get_frame (void) {
-	struct frame *frame = NULL;
-	/* TODO: Fill this function. */
+	/* 새로운 물리페이지 할당받기 */
+	void *kva = palloc_get_page(PAL_USER);
+	/* 만약에 페이지 할당 실패시 PANIC("Todo") */
+	if(kva == NULL) PANIC("Todo");
 
-	ASSERT (frame != NULL);
-	ASSERT (frame->page == NULL);
-	return frame;
+	/* 프레임 구조체 동적으로 할당하기 */
+	struct frame *f = malloc(sizeof(struct frame));
+	ASSERT (f != NULL);
+	/* 구조체 초기화 작업 */
+	f->kva = kva;
+	f->page = NULL;
+	ASSERT (f->page == NULL);
+	return f;
 }
 
 /* Growing the stack. */
@@ -152,8 +163,9 @@ vm_dealloc_page (struct page *page) {
 bool
 vm_claim_page (void *va UNUSED) {
 	struct page *page = NULL;
-	/* TODO: Fill this function */
-
+	/* 해당 가상주소에 대한 페이지를 할당 */
+	/* 먼저 페이지를 찾고 vm_do_claim_page()를 호출 */
+	
 	return vm_do_claim_page (page);
 }
 
@@ -166,7 +178,10 @@ vm_do_claim_page (struct page *page) {
 	frame->page = page;
 	page->frame = frame;
 
-	/* TODO: Insert page table entry to map page's VA to frame's PA. */
+	/* 주어진 페이지에 물리 프레임을 항당 */
+	/* vm_get_frame으로 프레임을 얻고 MMU세팅을 수행 */
+	/* 가상주소와 물리 주소간 매핑 테이블에 추가 */
+	/* 성공 여부를 true / false로 반환 */
 
 	return swap_in (page, frame->kva);
 }
@@ -174,6 +189,7 @@ vm_do_claim_page (struct page *page) {
 /* Initialize new supplemental page table */
 void
 supplemental_page_table_init (struct supplemental_page_table *spt UNUSED) {
+	/* 보조 테이블을 초기화 한다 */
 }
 
 /* Copy supplemental page table from src to dst */
@@ -181,6 +197,7 @@ bool
 supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 		struct supplemental_page_table *src UNUSED) {
 }
+
 
 /* Free the resource hold by the supplemental page table */
 void
