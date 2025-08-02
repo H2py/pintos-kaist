@@ -60,7 +60,8 @@ struct page {
 };
 
 /* The representation of "frame" */
-struct frame {
+struct 
+frame {
 	void *kva;
 	struct page *page;
 };
