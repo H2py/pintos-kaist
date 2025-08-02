@@ -61,6 +61,9 @@ err:
 struct page *
 spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
 	struct page *page = NULL;
+	/* TODO: Fill this function. */
+	/* spt에서 va(가상주소)에 대응하는 페이지를 찾는다. */
+	/* 실패시 NULL */
 	/* TODO: 이 함수를 구현하세요요. */
 
 	return page;
@@ -71,6 +74,9 @@ bool
 spt_insert_page (struct supplemental_page_table *spt UNUSED,
 		struct page *page UNUSED) {
 	int succ = false;
+	/* TODO: Fill this function. */
+	/* 해당 페이지를 SPT를 삽입 */
+	/* 만약 해당 주소가 존재할 경우 삽입하지 않음 */
 	/* TODO: 이 함수를 구현하세요요. */
 
 	return succ;
@@ -107,12 +113,12 @@ vm_evict_frame (void) {
  * 이 함수는 사용 가능한 메모리 공간을 얻기 위해 프레임을 제거합니다.*/
 static struct frame *
 vm_get_frame (void) {
-	struct frame *frame = NULL;
-	/* TODO: 이 함수를 구현하세요. */
+    struct frame *frame = NULL;
+    /* TODO: 이 함수를 구현하세요. */
 
-	ASSERT (frame != NULL);
-	ASSERT (frame->page == NULL);
-	return frame;
+    ASSERT (frame != NULL);
+    ASSERT (frame->page == NULL);
+    return frame;
 }
 
 /* 스택을 확장합니다. */
@@ -152,8 +158,10 @@ vm_dealloc_page (struct page *page) {
 bool
 vm_claim_page (void *va UNUSED) {
 	struct page *page = NULL;
+	/* 해당 가상주소에 대한 페이지를 할당 */
+	/* 먼저 페이지를 찾고 vm_do_claim_page()를 호출 */
+	
 	/* TODO: 이 함수를 구현하세요. */
-
 	return vm_do_claim_page (page);
 }
 
@@ -166,6 +174,10 @@ vm_do_claim_page (struct page *page) {
 	frame->page = page;
 	page->frame = frame;
 
+	/* 주어진 페이지에 물리 프레임을 항당 */
+	/* vm_get_frame으로 프레임을 얻고 MMU세팅을 수행 */
+	/* 가상주소와 물리 주소간 매핑 테이블에 추가 */
+	/* 성공 여부를 true / false로 반환 */
     /* TODO: Insert page table entry to map page's VA to frame's PA. */
 	/* TODO: 페이지의 VA를 프레임의 PA에 매핑하기 위해 페이지 테이블 항목을 삽입하세요. */
 
@@ -175,6 +187,7 @@ vm_do_claim_page (struct page *page) {
 /* 새로운 보조 페이지 테이블(supplemental_page_table)을 초기화합니다 */
 void
 supplemental_page_table_init (struct supplemental_page_table *spt UNUSED) {
+	/* 보조 테이블을 초기화 한다 */
 }
 
 /* 보조 페이지 테이블(supplemental_page_table)을 src에서 dst로 복사합니다 */
@@ -183,6 +196,8 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 		struct supplemental_page_table *src UNUSED) {
 }
 
+
+/* Free the resource hold by the supplemental page table */
 /* 보조 페이지 테이블(supplemental_page_table)이 보유한 리소스를 해제합니다 */
 void
 supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
