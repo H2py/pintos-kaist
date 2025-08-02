@@ -65,25 +65,9 @@ tid_t process_create_initd(const char *file_name)
     if (tid == TID_ERROR){
         palloc_free_page(fn_copy);
         return TID_ERROR;
-    } 
-
-    e = list_begin(&thread_current()->child_list);
-    
-    while(e != list_end(&thread_current()->child_list)){
-        child = list_entry(e, struct thread, c_elem);
-    
-        if (tid == child->tid){
-            sema_down(&child->exec_sema);
-            remove(e);
-            return tid;
-        }
-    
-        e = list_next(e);
     }
 
-    palloc_free_page(fn_copy); // TODO : Check
-
-    return TID_ERROR;
+    return tid;
 }
 
 /* A thread function that launches first user process. */
@@ -244,14 +228,11 @@ int process_exec(void *f_name)
     success = load(file_name, &_if);
 
     // 5. 실패 시 처리
-    if (!success){
-        // palloc_free_page(file_name);
-        return -1;
-    } 
     palloc_free_page(file_name);
+    if (!success){
+        return -1;
+    }
     
-    // 6. 새로운 프로세스 시작
-    sema_up(&thread_current()->exec_sema);
 
     do_iret(&_if);
     NOT_REACHED();
@@ -476,16 +457,6 @@ static bool load(const char *file_name, struct intr_frame *if_)
         goto done;
     }
 
-	file_deny_write(file);
-
-	struct file *dup_file = file_duplicate(file);
-    if(dup_file == NULL){
-        goto done;
-    }
-	t->running_file = dup_file;
-	// t->running_file = file;
-
-
     /* Read and verify executable header. */
     // 읽고, ELF 헤더 검증
 
@@ -565,6 +536,10 @@ static bool load(const char *file_name, struct intr_frame *if_)
         }
     }
 
+    
+    file_deny_write(file);
+    t->running_file = file;
+	
 
     /* Set up stack. */
     if (!setup_stack(if_)) goto done;
