@@ -59,6 +59,8 @@ struct page {
 	};
 };
 
+
+/* The representation of "frame" */
 /* "프레임"의 표현 */
 struct frame {
 	void *kva;

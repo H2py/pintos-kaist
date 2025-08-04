@@ -25,6 +25,8 @@ fork-boundary PASS
 priority-donate-chain PASS
 rox-multichild PASS
 create-bound PASS
+rox-multichild PASS
+create-bound PASS
 lg-random PASS
 priority-condvar PASS
 priority-donate-nest PASS
