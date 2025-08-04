@@ -2,6 +2,7 @@
 #define VM_VM_H
 #include <stdbool.h>
 #include "threads/palloc.h"
+#include "lib/kernel/hash.h"
 
 enum vm_type {
 	/* 초기화되지 않은 페이지 */
@@ -44,6 +45,7 @@ struct page {
 	const struct page_operations *operations;
 	void *va;              /* 사용자 공간 기준 주소 */
 	struct frame *frame;   /* 프레임에 대한 역참조 */
+	struct hash_elem h_elem;
 
 	/* 여러분의 구현 */
 
@@ -94,8 +96,7 @@ struct page_operations {
  * 이 구조체에 대해 특정 설계를 강제하고 싶지 않습니다.
  * 모든 설계는 여러분에게 달려있습니다. */
 struct supplemental_page_table {
-	struct list frame_table;
-
+	struct hash spt_table;
 };
 
 #include "threads/thread.h"

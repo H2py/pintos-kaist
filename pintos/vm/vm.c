@@ -60,26 +60,32 @@ err:
 /* spt에서 VA를 찾아 페이지를 반환합니다. 오류 시 NULL을 반환합니다. */
 struct page *
 spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
-	struct page *page = NULL;
 	/* TODO: Fill this function. */
 	/* spt에서 va(가상주소)에 대응하는 페이지를 찾는다. */
 	/* 실패시 NULL */
 	/* TODO: 이 함수를 구현하세요요. */
+	struct page *page = NULL;
+	struct hash_elem *e;
 
-	return page;
+	page->va = va;
+	e = hash_find(&spt->spt_table, &page->h_elem);
+
+	return e != NULL ? hash_entry(e, struct page, h_elem) : NULL;
 }
 
 /* 검증과 함께 PAGE를 spt에 삽입합니다. */
 bool
 spt_insert_page (struct supplemental_page_table *spt UNUSED,
 		struct page *page UNUSED) {
-	int succ = false;
 	/* TODO: Fill this function. */
-	/* 해당 페이지를 SPT를 삽입 */
+	/* 해당 페이지를 SPT에 삽입 */
 	/* 만약 해당 주소가 존재할 경우 삽입하지 않음 */
-	/* TODO: 이 함수를 구현하세요요. */
+	/* TODO: 이 함수를 구현하세요. */
+	int succ = true;
+	if(!hash_insert(&spt->spt_table, &page->h_elem))
+		return succ;
 
-	return succ;
+	return !succ;
 }
 
 void
@@ -93,7 +99,7 @@ static struct frame *
 vm_get_victim (void) {
 	struct frame *victim = NULL;
     /* TODO: The policy for eviction is up to you. */
-	 /* TODO: 제거 정책( 진성이의 주석: 페이지 교체 정책인듯 )은 여러분에게 달려있습니다. */
+	/* TODO: 제거 정책( 진성이의 주석: 페이지 교체 정책인듯 )은 여러분에게 달려있습니다. */
 
 	return victim;
 }
@@ -187,7 +193,7 @@ vm_do_claim_page (struct page *page) {
 /* 새로운 보조 페이지 테이블(supplemental_page_table)을 초기화합니다 */
 void
 supplemental_page_table_init (struct supplemental_page_table *spt UNUSED) {
-	/* 보조 테이블을 초기화 한다 */
+	hash_init(&spt->spt_table, hash_func, hash_less, NULL);
 }
 
 /* 보조 페이지 테이블(supplemental_page_table)을 src에서 dst로 복사합니다 */
