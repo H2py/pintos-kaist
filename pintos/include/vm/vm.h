@@ -63,6 +63,7 @@ struct page {
 struct frame {
 	void *kva;
 	struct page *page;
+	struct list_elem f_elem;
 };
 
 /* The function table for page operations.
@@ -91,6 +92,8 @@ struct page_operations {
  * 이 구조체에 대해 특정 설계를 강제하고 싶지 않습니다.
  * 모든 설계는 여러분에게 달려있습니다. */
 struct supplemental_page_table {
+	struct list frame_table;
+
 };
 
 #include "threads/thread.h"
