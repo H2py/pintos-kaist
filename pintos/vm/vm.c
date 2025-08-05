@@ -3,6 +3,7 @@
 #include "threads/malloc.h"
 #include "vm/vm.h"
 #include "vm/inspect.h"
+#include "include/threads/mmu.h"
 
 /* 각 하위 시스템의 초기화 코드를 호출하여 가상 메모리 하위 시스템을 초기화합니다. */
 void
@@ -15,6 +16,7 @@ vm_init (void) {
 	register_inspect_intr ();
 	/* 위의 라인들은 수정하지 마세요. */
 	/* TODO: 여러분의 코드가 여기에 들어갑니다. */
+	list_init(&frame_table);
 }
 
 /* 페이지의 타입을 가져옵니다. 이 함수는 페이지가 초기화된 후의 타입을 알고 싶을 때 유용합니다.
@@ -63,8 +65,10 @@ spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
 	/* TODO: Fill this function. */
 	/* spt에서 va(가상주소)에 대응하는 페이지를 찾는다. */
 	/* 실패시 NULL */
-	/* TODO: 이 함수를 구현하세요요. */
-	struct page *page = NULL;
+	/* TODO: 이 함수를 구현하세요. */
+	struct page *page = malloc(sizeof(struct page));
+	if(page == NULL) return NULL;
+
 	struct hash_elem *e;
 
 	page->va = va;
@@ -119,8 +123,18 @@ vm_evict_frame (void) {
  * 이 함수는 사용 가능한 메모리 공간을 얻기 위해 프레임을 제거합니다.*/
 static struct frame *
 vm_get_frame (void) {
-    struct frame *frame = NULL;
-    /* TODO: 이 함수를 구현하세요. */
+    struct frame *frame = malloc(sizeof(struct frame));
+	if(frame == NULL) return NULL;
+    void* kva = palloc_get_page(PAL_USER);
+	
+	if(kva == NULL) {
+		free(frame);
+		PANIC("todo");
+	}
+	else {
+		frame->kva = kva;
+		frame->page = NULL;
+	}
 
     ASSERT (frame != NULL);
     ASSERT (frame->page == NULL);
@@ -163,25 +177,32 @@ vm_dealloc_page (struct page *page) {
 /* VA에 할당된 페이지를 요청합니다. */
 bool
 vm_claim_page (void *va UNUSED) {
-	struct page *page = NULL;
 	/* 해당 가상주소에 대한 페이지를 할당 */
 	/* 먼저 페이지를 찾고 vm_do_claim_page()를 호출 */
-	
+
 	/* TODO: 이 함수를 구현하세요. */
+	struct page *page = NULL;
+	struct supplemental_page_table *spt = &thread_current ()->spt;
+
+	page = spt_find_page(&spt, va);
 	return vm_do_claim_page (page);
 }
 
 /* PAGE를 요청하고 MMU를 설정합니다. */
 static bool
 vm_do_claim_page (struct page *page) {
+	/* 주어진 페이지에 물리 프레임을 항당 */
+	/* vm_get_frame으로 프레임을 얻고 MMU세팅을 수행 */
 	struct frame *frame = vm_get_frame ();
-
+	struct thread *cur = thread_current();
+	uint64_t *pte = pml4e_walk (cur->pml4, (uint64_t) page, false);
+	bool writable = pte != NULL && (*pte & PTE_W) != 0;
 	/* Set links */
 	frame->page = page;
 	page->frame = frame;
 
-	/* 주어진 페이지에 물리 프레임을 항당 */
-	/* vm_get_frame으로 프레임을 얻고 MMU세팅을 수행 */
+	if(pml4_set_page(&cur->pml4, page->va, frame->kva, writable)) return true;
+	
 	/* 가상주소와 물리 주소간 매핑 테이블에 추가 */
 	/* 성공 여부를 true / false로 반환 */
     /* TODO: Insert page table entry to map page's VA to frame's PA. */
