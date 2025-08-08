@@ -48,6 +48,7 @@ struct page {
 	struct hash_elem h_elem;
 
 	/* 여러분의 구현 */
+	bool writable; 			/* 여기서 사용되는 writable은 lazy load segment 시점에 설정된 writable을 의미한다*/
 
 	/* 타입별 데이터가 union에 바인딩됩니다.
 	 * 각 함수는 현재 union을 자동으로 감지합니다 */

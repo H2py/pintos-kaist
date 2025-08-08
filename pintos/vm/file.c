@@ -28,6 +28,8 @@ file_backed_initializer (struct page *page, enum vm_type type, void *kva) {
 	page->operations = &file_ops;
 
 	struct file_page *file_page = &page->file;
+
+	return true; // TODO: 수정 필요
 }
 
 /* 파일에서 내용을 읽어와 페이지를 스왑 인합니다. */

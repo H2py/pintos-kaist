@@ -39,22 +39,38 @@ static struct frame *vm_evict_frame (void);
 
 /* 초기화 함수와 함께 대기 중인 페이지 객체를 생성합니다. 페이지를 생성하려면 직접 생성하지 말고
  * 이 함수나 `vm_alloc_page`를 통해 생성하세요. */
+
 bool
 vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 		vm_initializer *init, void *aux) {
 
 	ASSERT (VM_TYPE(type) != VM_UNINIT)
-
 	struct supplemental_page_table *spt = &thread_current ()->spt;
+	struct page *page = malloc(sizeof (struct page));
+	if(page == NULL) return false;
 
 	/* upage가 이미 점유되어 있는지 확인합니다. */
-	if (spt_find_page (spt, upage) == NULL) {
-		/* TODO: 페이지를 생성하고, VM 타입에 따라 초기화 함수를 가져와서
-		 * TODO: uninit_new를 호출하여 "uninit" 페이지 구조체를 생성하세요. uninit_new를
-		 * TODO: 호출한 후 필드를 수정해야 합니다. */
+	/* TODO: 페이지를 생성하고, VM 타입에 따라 초기화 함수를 가져와서
+     * TODO: uninit_new를 호출하여 "uninit" 페이지 구조체를 생성하세요. uninit_new를
+     * TODO: 호출한 후 필드를 수정해야 합니다. */
 
-		/* TODO: 페이지를 spt에 삽입하세요. */
+    /* TODO: 페이지를 spt에 삽입하세요. */
+	
+	page = spt_find_page(spt, upage);
+	if (page == NULL) {
+		free(page);
+		return false;
 	}
+
+	/* load_segment 인자로 받았던 wrtiable을 현재 찾아온 page 구조체의 멤버 변수로 사용*/
+	if (VM_TYPE(type) == VM_ANON) {
+		uninit_new(page, upage, init, type, aux, anon_initializer);
+	} else if (VM_TYPE(type) == VM_FILE) {
+		uninit_new(page, upage, init, type, aux, file_backed_initializer);
+	}
+	
+	page->writable = writable;
+	return spt_insert_page(spt, page);
 err:
 	return false;
 }
@@ -131,10 +147,9 @@ vm_get_frame (void) {
 		free(frame);
 		PANIC("todo");
 	}
-	else {
-		frame->kva = kva;
-		frame->page = NULL;
-	}
+	
+	frame->kva = kva;
+	frame->page = NULL;
 
     ASSERT (frame != NULL);
     ASSERT (frame->page == NULL);
@@ -193,15 +208,15 @@ static bool
 vm_do_claim_page (struct page *page) {
 	/* 주어진 페이지에 물리 프레임을 항당 */
 	/* vm_get_frame으로 프레임을 얻고 MMU세팅을 수행 */
-	struct frame *frame = vm_get_frame ();
 	struct thread *cur = thread_current();
-	uint64_t *pte = pml4e_walk (cur->pml4, (uint64_t) page, false);
-	bool writable = pte != NULL && (*pte & PTE_W) != 0;
-	/* Set links */
+	struct frame *frame = vm_get_frame ();
+	if(frame == NULL) return false;
+
 	frame->page = page;
 	page->frame = frame;
 
-	if(pml4_set_page(&cur->pml4, page->va, frame->kva, writable)) return true;
+	/* Set links */
+	if(!pml4_set_page(&cur->pml4, page->va, frame->kva, page->writable)) return false;
 	
 	/* 가상주소와 물리 주소간 매핑 테이블에 추가 */
 	/* 성공 여부를 true / false로 반환 */
@@ -233,3 +248,4 @@ supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 	/* TODO: 스레드가 보유한 모든 보조 페이지 테이블(supplemental_page_table)을 파괴하고
 	 * TODO: 수정된 모든 내용을 저장소에 다시 쓰세요. */
 }
+

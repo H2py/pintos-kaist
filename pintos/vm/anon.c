@@ -22,7 +22,7 @@ static const struct page_operations anon_ops = {
 void
 vm_anon_init (void) {
 	/* TODO: swap_disk를 설정하세요. */
-	swap_disk = NULL;
+	swap_disk = disk_get(1,1);
 }
 
 /* 파일 매핑을 초기화합니다 */
@@ -32,6 +32,8 @@ anon_initializer (struct page *page, enum vm_type type, void *kva) {
 	page->operations = &anon_ops;
 
 	struct anon_page *anon_page = &page->anon;
+
+	return true; // TODO: 수정 필요
 }
 
 /* 스왑 디스크에서 내용을 읽어와 페이지를 스왑 인합니다. */
