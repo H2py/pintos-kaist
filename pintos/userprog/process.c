@@ -29,6 +29,13 @@ static bool load(const char *file_name, struct intr_frame *if_);
 static void initd(void *f_name);
 static void __do_fork(void *);
 
+static struct lazy_load_data {
+    struct file *file;
+    off_t ofs;
+    size_t page_read_bytes;
+    size_t page_zero_bytes;
+};
+
 /* General process initializer for initd and other process. */
 static void process_init(void)
 {
@@ -188,7 +195,6 @@ static void __do_fork(void *aux)
     {
         if (parent->fdt[i]){
             current->fdt[i] = file_duplicate(parent->fdt[i]);
-            // printf("%d\n",i);
         }
     }
 
@@ -206,7 +212,6 @@ error:
     current->exit_status = -1;
     sema_up(&thread_current()->fork_sema);
     thread_exit();
-    // exit(-1);
 }
 
 int process_exec(void *f_name)
@@ -232,7 +237,6 @@ int process_exec(void *f_name)
     if (!success){
         return -1;
     }
-    
 
     do_iret(&_if);
     NOT_REACHED();
@@ -291,8 +295,7 @@ void process_exit(void)
             curr->fdt[fd] = NULL;
         }
     }
-    free (curr->fdt);
-   
+    
     curr->next_fd = 2;
     
     if (curr->running_file)
@@ -301,6 +304,7 @@ void process_exit(void)
         curr->running_file = NULL;
     }
     
+    free (curr->fdt);
     process_cleanup();
     
     sema_up(&curr->wait_sema);
@@ -559,8 +563,10 @@ static bool load(const char *file_name, struct intr_frame *if_)
     }
 
     if_->rsp -= if_->rsp % 8;  // padding
+    memset(if_->rsp, 0, if_->rsp % 8);
 
     if_->rsp -= sizeof(char *);  // null 삽입
+    memset(if_->rsp, 0, 8);
 
     uintptr_t argv_p;
     for (i = argc - 1; i >= 0; i--)
@@ -577,6 +583,7 @@ static bool load(const char *file_name, struct intr_frame *if_)
     memcpy(if_->rsp, &argc, sizeof(long int));  // argc 넣기
 
     if_->rsp -= sizeof(char *);  // argv 주소 넣기
+    memset(if_->rsp, 0, 8);
 
     if_->R.rsi = argv_p;
     if_->R.rdi = argc;
@@ -742,6 +749,25 @@ static bool lazy_load_segment(struct page *page, void *aux)
     /* TODO: Load the segment from the file */
     /* TODO: This called when the first page fault occurs on address VA. */
     /* TODO: VA is available when calling this function. */
+
+    struct thread *cur = thread_current();
+    struct lazy_load_data *data = (struct lazy_load_data*) aux;
+
+    /* 받아온 인자를 사용하기 쉽게 바꾸는 작업*/
+    struct file *file = data->file;
+    off_t ofs = data->ofs;
+    size_t page_read_bytes = data->page_read_bytes;
+    size_t page_zero_bytes = data->page_zero_bytes;
+
+
+    if (file_read_at(file, page->frame->kva, page_read_bytes, ofs) != (int) page_read_bytes);
+    {
+        free(page);
+        return false;
+    }
+    memset(page + page_read_bytes, 0, page_zero_bytes);
+
+    return vm_claim_page(page->va);
 }
 
 /* Loads a segment starting at offset OFS in FILE at address
@@ -775,14 +801,27 @@ static bool load_segment(struct file *file, off_t ofs, uint8_t *upage,
         size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
         /* TODO: Set up aux to pass information to the lazy_load_segment. */
-        void *aux = NULL;
+        struct lazy_load_data *lazy_load_aux = malloc(sizeof(struct lazy_load_data));
+        if(lazy_load_aux == NULL) {        
+            return -1;
+        }
+
+        lazy_load_aux->file = file;
+        lazy_load_aux->ofs = ofs;
+        lazy_load_aux->page_read_bytes = page_read_bytes;
+        lazy_load_aux->page_zero_bytes= page_zero_bytes;
+
         if (!vm_alloc_page_with_initializer(VM_ANON, upage, writable,
-                                            lazy_load_segment, aux))
+                                            lazy_load_segment, lazy_load_aux))
+        {
+            free(lazy_load_aux);
             return false;
+        }
 
         /* Advance. */
         read_bytes -= page_read_bytes;
         zero_bytes -= page_zero_bytes;
+        ofs += page_read_bytes;
         upage += PGSIZE;
     }
     return true;
@@ -793,11 +832,13 @@ static bool setup_stack(struct intr_frame *if_)
 {
     bool success = false;
     void *stack_bottom = (void *) (((uint8_t *) USER_STACK) - PGSIZE);
-
     /* TODO: Map the stack on stack_bottom and claim the page immediately.
      * TODO: If success, set the rsp accordingly.
      * TODO: You should mark the page is stack. */
     /* TODO: Your code goes here */
+
+    
+    if_->rsp = USER_STACK;  
 
     return success;
 }
