@@ -837,7 +837,7 @@ static bool setup_stack(struct intr_frame *if_)
         if_->rsp = USER_STACK;
         thread_current()->spt.stack_bottom = stack_bottom;
     }
-    
+
     return success;
 }
 #endif /* VM */

@@ -213,6 +213,7 @@ vm_do_claim_page (struct page *page) {
 	/* Set links */
 	if(pml4_set_page(cur->pml4, page->va, frame->kva, page->writable))
 		return swap_in(page, frame->kva);
+
 	
 	/* 가상주소와 물리 주소간 매핑 테이블에 추가 */
 	/* 성공 여부를 true / false로 반환 */
