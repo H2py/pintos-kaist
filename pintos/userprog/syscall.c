@@ -58,7 +58,7 @@ void syscall_handler(struct intr_frame *f)
             break;
         case SYS_EXIT:
             int exit_status = f->R.rdi;
-            exit(exit_status);  //status 숫자를 뭘 넣어줘야 하는거지?
+            exit(exit_status); 
             break;
         case SYS_FORK:
             const char* fork_file_name = f->R.rdi;
@@ -183,7 +183,6 @@ void exit(int status)
 
 tid_t fork(const char *thread_name, struct intr_frame *if_)
 {
-    // struct intr_frame *if_ = pg_round_up(&thread_name) - sizeof(struct intr_frame);
     return process_fork(thread_name, if_);
 }
 

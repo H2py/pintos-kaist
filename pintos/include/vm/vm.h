@@ -34,7 +34,7 @@ enum vm_type {
 
 struct page_operations;
 struct thread;
-struct list frame_table;
+extern struct list frame_table;
 #define VM_TYPE(type) ((type) & 7)
 
 /* "페이지"의 표현.
@@ -98,6 +98,7 @@ struct page_operations {
  * 모든 설계는 여러분에게 달려있습니다. */
 struct supplemental_page_table {
 	struct hash spt_table;
+	void *stack_bottom;
 };
 
 #include "threads/thread.h"
