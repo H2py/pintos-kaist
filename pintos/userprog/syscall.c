@@ -50,6 +50,7 @@ void syscall_init(void)
 /* The main system call interface */
 void syscall_handler(struct intr_frame *f)
 {
+    thread_current()->rsp = f->rsp;
     uint64_t sys_numer = f->R.rax;
     switch (sys_numer)
     {
@@ -122,13 +123,12 @@ void syscall_handler(struct intr_frame *f)
             int close_fd = f->R.rdi;
             close(close_fd);
             break;
-            // projec 3
         case SYS_MMAP:
-            	printf("dd");
-            	break;
+            printf("dd");
+            break;
         case SYS_MUNMAP:
-            	printf("dd");
-            	break;
+            printf("dd");
+            break;
     }
     // thread_exit ();
 }
