@@ -105,6 +105,7 @@ uint64_t hash_int (int);
 
 unsigned hash_func (const struct hash_elem *p_, void *aux);
 bool hash_less (const struct hash_elem *a_, const struct hash_elem *b_, void *aux);
+void hash_page_destroy (struct hash_elem *e, void *aux);
 
 
 #endif /* lib/kernel/hash.h */

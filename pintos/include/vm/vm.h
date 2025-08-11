@@ -36,6 +36,7 @@ struct page_operations;
 struct thread;
 extern struct list frame_table;
 #define VM_TYPE(type) ((type) & 7)
+#define USER_STACK_MAX (USER_STACK - (1 << 20))
 
 /* "페이지"의 표현.
  * 이것은 일종의 "부모 클래스"로, 네 개의 "자식 클래스"를 가집니다:

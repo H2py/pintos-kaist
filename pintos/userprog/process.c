@@ -754,11 +754,13 @@ static bool lazy_load_segment(struct page *page, void *aux)
 
     if (file_read_at(data->file, kva, data->page_read_bytes, data->ofs) != (int) data->page_read_bytes)
     {
+        free(data);
         palloc_free_page(kva);
         return false;
     }
     memset(kva + data->page_read_bytes, 0, data->page_zero_bytes);
 
+    free(data);
     return true;
 }
 
@@ -793,7 +795,7 @@ static bool load_segment(struct file *file, off_t ofs, uint8_t *upage,
         size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
         /* TODO: Set up aux to pass information to the lazy_load_segment. */
-        struct lazy_load_data *data = malloc(sizeof(struct lazy_load_data));
+        struct lazy_load_data *data = (struct lazy_load_data *)malloc(sizeof(struct lazy_load_data));
         if(data == NULL)         
             return false;
         
@@ -831,13 +833,14 @@ static bool setup_stack(struct intr_frame *if_)
     if(!vm_alloc_page(VM_ANON | VM_MARKER_0, stack_bottom, true))
         return false;
 
+
     success = vm_claim_page(stack_bottom);
     
     if(success) {
         if_->rsp = USER_STACK;
         thread_current()->spt.stack_bottom = stack_bottom;
     }
-
+    
     return success;
 }
 #endif /* VM */

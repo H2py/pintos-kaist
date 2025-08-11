@@ -422,3 +422,9 @@ hash_less (const struct hash_elem *a_,
 
   return a->va < b->va;
 }
+
+void hash_page_destroy (struct hash_elem *e, void *aux)
+{
+	struct page *page = hash_entry(e, struct page, h_elem);
+	vm_dealloc_page(page);
+}
