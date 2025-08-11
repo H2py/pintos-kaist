@@ -4,6 +4,8 @@
 #include "vm/vm.h"
 #include "vm/inspect.h"
 #include "include/threads/mmu.h"
+#include "include/userprog/process.h"
+#include <string.h>
 
 struct list frame_table;
 /* 각 하위 시스템의 초기화 코드를 호출하여 가상 메모리 하위 시스템을 초기화합니다. */
@@ -137,14 +139,13 @@ static struct frame *
 vm_get_frame (void) {
     struct frame *frame = malloc(sizeof(struct frame));
 	if(frame == NULL) return NULL;
-    frame->kva = palloc_get_page(PAL_USER);
+    void *kva = palloc_get_page(PAL_USER);
 	
-	if(frame->kva == NULL) {
-		
-		frame->page = NULL;
+	if(kva == NULL) {
 		PANIC("todo");
 	}
 	
+	frame->kva = kva;
 	frame->page = NULL;
 
     ASSERT (frame != NULL);
@@ -174,7 +175,23 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 	/* TODO: 폴트를 검증하세요 */
 	/* TODO: 여러분의 코드가 여기에 들어갑니다 */
 
-	return vm_do_claim_page (page);
+	/* return false를 해야할 지 고민 중 : 프로세스를 종료하고 자원을 해제해야 한다고 하였기 때문*/
+    if (addr == NULL || is_kernel_vaddr(addr))
+        return false;
+
+    if (not_present)
+    {
+		if(addr >= (f->rsp - 8) && (addr >= USER_STACK_MAX && addr <= USER_STACK))
+			vm_stack_growth(addr);
+		
+        page = spt_find_page(spt, addr);
+        if (page == NULL)
+            return false;
+        if (write == 1 && page->writable == 0) // write 불가능한 페이지에 write 요청한 경우
+            return false;
+        return vm_do_claim_page(page);
+    }
+    return false;
 }
 
 /* 페이지를 해제합니다.
@@ -232,6 +249,39 @@ supplemental_page_table_init (struct supplemental_page_table *spt UNUSED) {
 bool
 supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 		struct supplemental_page_table *src UNUSED) {
+	
+	if((src->spt_table.buckets == NULL) || (dst->spt_table.buckets == NULL)) return false;
+
+    struct hash_iterator i;
+    hash_first(&i, &src->spt_table);
+    while (hash_next(&i))
+    {
+        struct page *src_page = hash_entry(hash_cur(&i), struct page, h_elem);
+        enum vm_type type = src_page->operations->type;
+        void *upage = src_page->va;
+		bool writable = src_page->writable;
+
+        if (type == VM_UNINIT)
+        { 
+            vm_initializer *init = src_page->uninit.init;
+            void *aux = malloc(sizeof(struct lazy_load_data));
+			memcpy(aux, src_page->uninit.aux, sizeof(struct lazy_load_data));
+
+            vm_alloc_page_with_initializer(src_page->uninit.type, upage, writable, init, aux);
+            continue;
+        }
+
+        if (!vm_alloc_page(type, upage, src_page->writable)) 
+            return false;
+
+        if (!vm_claim_page(upage))
+            return false;
+
+        struct page *dst_page = spt_find_page(dst, upage);
+		memcpy(dst_page->frame->kva, src_page->frame->kva, PGSIZE);
+    }
+    return true;
+
 }
 
 
@@ -243,5 +293,6 @@ supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
      * TODO: writeback all the modified contents to the storage. */
 	/* TODO: 스레드가 보유한 모든 보조 페이지 테이블(supplemental_page_table)을 파괴하고
 	 * TODO: 수정된 모든 내용을 저장소에 다시 쓰세요. */
+	hash_clear(&spt->spt_table, hash_page_destroy);
 }
 
