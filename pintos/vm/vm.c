@@ -136,9 +136,10 @@ vm_evict_frame (void) {
  * 이 함수는 사용 가능한 메모리 공간을 얻기 위해 프레임을 제거합니다.*/
 static struct frame *
 vm_get_frame (void) {
-    struct frame *frame = malloc(sizeof(struct frame));
+  struct frame *frame = malloc(sizeof(struct frame));
 	if(frame == NULL) return NULL;
-    void *kva = palloc_get_page(PAL_USER);
+
+  void *kva = palloc_get_page(PAL_USER);
 	
 	if(kva == NULL) {
 		PANIC("todo");
@@ -176,6 +177,7 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 	struct page *page = NULL;
 	struct thread *cur = thread_current();
 
+
     if (addr == NULL || is_kernel_vaddr(addr))
         return false;
 
@@ -195,6 +197,7 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 
         if (page == NULL)
 			return false;
+
         return vm_do_claim_page(page);
     }
     return false;
