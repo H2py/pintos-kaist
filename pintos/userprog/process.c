@@ -798,7 +798,6 @@ static bool load_segment(struct file *file, off_t ofs, uint8_t *upage,
         struct lazy_load_data *data = (struct lazy_load_data *)malloc(sizeof(struct lazy_load_data));
         if(data == NULL)         
             return false;
-        
 
         data->file = file;
         data->ofs = ofs;
@@ -809,6 +808,7 @@ static bool load_segment(struct file *file, off_t ofs, uint8_t *upage,
         {
             free(data);
             return false;
+
         }
 
         /* Advance. */
@@ -838,7 +838,7 @@ static bool setup_stack(struct intr_frame *if_)
     
     if(success) {
         if_->rsp = USER_STACK;
-        thread_current()->spt.stack_bottom = stack_bottom;
+        thread_current()->stack_bottom = stack_bottom;
     }
     
     return success;
