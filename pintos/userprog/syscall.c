@@ -267,7 +267,7 @@ void seek(int fd, unsigned position)
 
 static void is_valid_pointer(void *ptr)
 {
-    if (ptr == NULL || is_kernel_vaddr(ptr) || !spt_find_page(&thread_current()->spt, pg_round_down(ptr))) exit(-1);
+    if (ptr == NULL || is_kernel_vaddr(ptr)) exit(-1);
 }
 
 struct file *get_file_by_fd(int fd)

@@ -830,7 +830,7 @@ static bool setup_stack(struct intr_frame *if_)
     
     if(success) {
         if_->rsp = USER_STACK;
-        thread_current()->spt.stack_bottom = stack_bottom;
+        thread_current()->stack_bottom = stack_bottom;
     }
     
     return success;

@@ -39,6 +39,7 @@ page_get_type (struct page *page) {
 static struct frame *vm_get_victim (void);
 static bool vm_do_claim_page (struct page *page);
 static struct frame *vm_evict_frame (void);
+static void vm_stack_growth (void *addr);
 
 /* 초기화 함수와 함께 대기 중인 페이지 객체를 생성합니다. 페이지를 생성하려면 직접 생성하지 말고
  * 이 함수나 `vm_alloc_page`를 통해 생성하세요. */
@@ -101,8 +102,6 @@ spt_insert_page (struct supplemental_page_table *spt UNUSED,
 		struct page *page UNUSED) {
 	/* TODO: Fill this function. */
 	/* 해당 페이지를 SPT에 삽입 */
-	/* 만약 해당 주소가 존재할 경우 삽입하지 않음 */
-	/* TODO: 이 함수를 구현하세요. */
 	return hash_insert(&spt->spt_table, &page->h_elem) == NULL;
 }
 
@@ -157,7 +156,10 @@ vm_get_frame (void) {
 static void
 vm_stack_growth (void *addr UNUSED) {
 	struct thread *cur = thread_current();
-	cur->spt.stack_bottom = 0x11232283;
+	cur->stack_bottom -= PGSIZE; 
+	if(vm_alloc_page(VM_ANON, cur->stack_bottom, true)) {
+		vm_claim_page(cur->stack_bottom);
+	}
 }
 
 /* Handle the fault on write_protected page */
@@ -172,25 +174,27 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 		bool user UNUSED, bool write UNUSED, bool not_present UNUSED) {
 	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
 	struct page *page = NULL;
-    /* TODO: Validate the fault */
-    /* TODO: Your code goes here */
-	/* TODO: 폴트를 검증하세요 */
-	/* TODO: 여러분의 코드가 여기에 들어갑니다 */
+	struct thread *cur = thread_current();
 
-	/* return false를 해야할 지 고민 중 : 프로세스를 종료하고 자원을 해제해야 한다고 하였기 때문*/
     if (addr == NULL || is_kernel_vaddr(addr))
         return false;
 
     if (not_present)
     {
-		if(addr >= (f->rsp - 8) && (addr >= USER_STACK_MAX && addr <= USER_STACK))
+		void *ursp = user ? f->rsp : cur->rsp;
+		/* 스택 확장 처리 스택 공간에 존재하고, 스택 범위 내에서 page_fault 발생 시, vm_stack_grwoth 호출*/
+		if(user && (addr >= ursp - 8) && (addr >= USER_STACK_MAX) && (addr <= USER_STACK))
+		{
 			vm_stack_growth(addr);
+			return true;
+		}
 		
-        page = spt_find_page(spt, addr);
+        page = spt_find_page(spt, pg_round_down(addr));
+		if (write == 1 && page->writable == 0) // write 불가능한 페이지에 write 요청한 경우
+			return false;
+
         if (page == NULL)
-            return false;
-        if (write == 1 && page->writable == 0) // write 불가능한 페이지에 write 요청한 경우
-            return false;
+			return false;
         return vm_do_claim_page(page);
     }
     return false;
