@@ -29,6 +29,13 @@ static bool load(const char *file_name, struct intr_frame *if_);
 static void initd(void *f_name);
 static void __do_fork(void *);
 
+static struct lazy_load_data {
+    struct file *file;
+    off_t ofs;
+    size_t page_read_bytes;
+    size_t page_zero_bytes;
+};
+
 /* General process initializer for initd and other process. */
 static void process_init(void)
 {
@@ -825,6 +832,7 @@ static bool setup_stack(struct intr_frame *if_)
 
     if(!vm_alloc_page(VM_ANON | VM_MARKER_0, stack_bottom, true))
         return false;
+
 
     success = vm_claim_page(stack_bottom);
     
