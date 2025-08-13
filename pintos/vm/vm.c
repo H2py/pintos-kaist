@@ -6,9 +6,11 @@
 
 #include "include/threads/mmu.h"
 #include "include/userprog/process.h"
+#include "include/userprog/syscall.h"
 #include "threads/malloc.h"
 #include "vm/inspect.h"
 
+struct lock vm_lock;
 /* 각 하위 시스템의 초기화 코드를 호출하여 가상 메모리 하위 시스템을
  * 초기화합니다. */
 void vm_init(void)
@@ -22,6 +24,7 @@ void vm_init(void)
     /* 위의 라인들은 수정하지 마세요. */
     /* TODO: 여러분의 코드가 여기에 들어갑니다. */
     list_init(&thread_current()->spt.frame_table);
+    lock_init(&vm_lock);
 }
 
 /* 페이지의 타입을 가져옵니다. 이 함수는 페이지가 초기화된 후의 타입을 알고 싶을
@@ -108,7 +111,19 @@ struct page *spt_find_page(struct supplemental_page_table *spt UNUSED,
 bool spt_insert_page(struct supplemental_page_table *spt UNUSED,
                      struct page *page UNUSED)
 {
-    return hash_insert(&spt->spt_table, &page->h_elem) == NULL;
+    bool success = false;
+    if (lock_held_by_current_thread(&vm_lock))
+    {
+        lock_release(&vm_lock);
+    }
+    else
+    {
+        lock_acquire(&vm_lock);
+        if (hash_insert(&spt->spt_table, &page->h_elem) == NULL) success = true;
+        lock_release(&vm_lock);
+    }
+
+    return success;
 }
 
 void spt_remove_page(struct supplemental_page_table *spt, struct page *page)
@@ -266,6 +281,7 @@ void supplemental_page_table_init(struct supplemental_page_table *spt UNUSED)
 bool supplemental_page_table_copy(struct supplemental_page_table *dst UNUSED,
                                   struct supplemental_page_table *src UNUSED)
 {
+    lock_acquire(&vm_lock);
     if ((src->spt_table.buckets == NULL) || (dst->spt_table.buckets == NULL))
         return false;
 
@@ -288,13 +304,24 @@ bool supplemental_page_table_copy(struct supplemental_page_table *dst UNUSED,
                                            writable, init, aux);
             continue;
         }
+        else if (type == VM_FILE)
+        {
+            void *aux = malloc(sizeof(struct lazy_load_data));
+            memcpy(aux, &src_page->file, sizeof(struct lazy_load_data));
 
-        if (!vm_alloc_page(type, upage, src_page->writable)) return false;
-        if (!vm_claim_page(upage)) return false;
+            vm_alloc_page_with_initializer(type, upage, writable, NULL, aux);
+            if (!vm_claim_page(upage)) return false;
+        }
+        else
+        {
+            if (!vm_alloc_page(type, upage, src_page->writable)) return false;
+            if (!vm_claim_page(upage)) return false;
+        }
 
         struct page *dst_page = spt_find_page(dst, upage);
         memcpy(dst_page->frame->kva, src_page->frame->kva, PGSIZE);
     }
+    lock_release(&vm_lock);
     return true;
 }
 
