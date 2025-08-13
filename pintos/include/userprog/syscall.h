@@ -17,5 +17,7 @@ int filesize(int fd);
 void close(int fd);
 bool remove(const char *file);
 struct file *get_file_by_fd(int fd);
+void *mmap (void *addr, size_t length, int writable, int fd, off_t offset);
+void munmap (void *addr);
 extern struct lock global_lock;
 #endif /* userprog/syscall.h */
