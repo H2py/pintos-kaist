@@ -125,11 +125,9 @@ void syscall_handler(struct intr_frame *f)
             close(close_fd);
             break;
         case SYS_MMAP:
-            is_valid_pointer(f->R.rdi);
             f->R.rax = mmap(f->R.rdi, f->R.rsi, f->R.rdx, f->R.r10, f->R.r8);
             break;
         case SYS_MUNMAP:
-            is_valid_pointer(f->R.rdi);
             munmap(f->R.rdi);
             break;
     }
@@ -214,7 +212,7 @@ int wait(tid_t pid)
 
 int read(int fd, void *buffer, unsigned size)
 {
-    if(!spt_find_page(&thread_current()->spt, buffer)->writable) exit(-1);
+    if (!spt_find_page(&thread_current()->spt, buffer)->writable) exit(-1);
 
     if (fd == 0)
     {
@@ -274,21 +272,24 @@ void seek(int fd, unsigned position)
 void *mmap(void *addr, size_t length, int writable, int fd, off_t offset)
 {
     struct thread *cur = thread_current();
-    
-    if (fd == 0 || fd == 1) return NULL;
-    
-    if (!addr || addr == 0 || addr == NULL || length <= 0) return NULL;
-    
-    if(((uintptr_t)addr) % PGSIZE != 0 || (uintptr_t)offset % PGSIZE != 0) return NULL;
-    
-    if(!is_user_vaddr(addr) || !is_user_vaddr(addr + length)) return NULL;
-    
-    if (spt_find_page(&cur->spt, addr)) return NULL;
-    
-    struct file *file = get_file_by_fd(fd);
-    if(file == NULL) return NULL;
 
-    if(file_length(file) == 0) return NULL;
+    if (fd == 0 || fd == 1) return NULL;
+
+    if ((uintptr_t) addr + length < (uintptr_t) addr) return NULL;
+
+    if (!addr || addr == 0 || addr == NULL || length <= 0) return NULL;
+
+    if (((uintptr_t) addr) % PGSIZE != 0 || (uintptr_t) offset % PGSIZE != 0)
+        return NULL;
+
+    if (!is_user_vaddr(addr) || !is_user_vaddr(addr + length)) return NULL;
+
+    if (spt_find_page(&cur->spt, addr)) return NULL;
+
+    struct file *file = get_file_by_fd(fd);
+    if (file == NULL) return NULL;
+
+    if (file_length(file) == 0) return NULL;
 
     lock_acquire(&global_lock);
     void *ret = do_mmap(addr, length, writable, file, offset);
