@@ -69,7 +69,7 @@ close-twice PASS
 mmap-over-data PASS
 args-none PASS
 mmap-kernel PASS
-swap-fork FAIL
+swap-fork PASS
 create-bad-ptr PASS
 read-stdout PASS
 priority-fifo PASS
