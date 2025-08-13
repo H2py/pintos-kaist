@@ -34,7 +34,7 @@ enum vm_type {
 
 struct page_operations;
 struct thread;
-extern struct list frame_table;
+
 #define VM_TYPE(type) ((type) & 7)
 #define USER_STACK_MAX (USER_STACK - (1 << 20))
 
@@ -50,6 +50,7 @@ struct page {
 
 	/* 여러분의 구현 */
 	bool writable; 			/* 여기서 사용되는 writable은 lazy load segment 시점에 설정된 writable을 의미한다*/
+	int mmap_page_cnt;
 
 	/* 타입별 데이터가 union에 바인딩됩니다.
 	 * 각 함수는 현재 union을 자동으로 감지합니다 */
@@ -99,7 +100,7 @@ struct page_operations {
  * 모든 설계는 여러분에게 달려있습니다. */
 struct supplemental_page_table {
 	struct hash spt_table;
-	void *stack_bottom;
+	struct list frame_table;
 };
 
 #include "threads/thread.h"

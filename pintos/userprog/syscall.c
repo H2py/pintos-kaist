@@ -36,7 +36,7 @@ static void is_valid_pointer(void *);
 
 void syscall_init(void)
 {
-	lock_init(&global_lock);
+    lock_init(&global_lock);
     write_msr(MSR_STAR, ((uint64_t) SEL_UCSEG - 0x10) << 48 |
                             ((uint64_t) SEL_KCSEG) << 32);
     write_msr(MSR_LSTAR, (uint64_t) syscall_entry);
@@ -44,7 +44,8 @@ void syscall_init(void)
     /* The interrupt service rountine should not serve any interrupts
      * until the syscall_entry swaps the userland stack to the kernel
      * mode stack. Therefore, we masked the FLAG_FL. */
-    write_msr(MSR_SYSCALL_MASK, FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);	
+    write_msr(MSR_SYSCALL_MASK,
+              FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
 }
 
 /* The main system call interface */
@@ -59,16 +60,16 @@ void syscall_handler(struct intr_frame *f)
             break;
         case SYS_EXIT:
             int exit_status = f->R.rdi;
-            exit(exit_status); 
+            exit(exit_status);
             break;
         case SYS_FORK:
-            const char* fork_file_name = f->R.rdi;
+            const char *fork_file_name = f->R.rdi;
             struct intr_frame *if_ = f;
             is_valid_pointer(fork_file_name);
             f->R.rax = fork(f->R.rdi, if_);
             break;
         case SYS_EXEC:
-            const char* exec_file_name = f->R.rdi;
+            const char *exec_file_name = f->R.rdi;
             is_valid_pointer(exec_file_name);
             f->R.rax = exec(exec_file_name);
             break;
@@ -77,18 +78,18 @@ void syscall_handler(struct intr_frame *f)
             f->R.rax = wait(tid);
             break;
         case SYS_CREATE:
-            const char* create_file_name = f->R.rdi;
+            const char *create_file_name = f->R.rdi;
             unsigned initial_size = f->R.rsi;
             is_valid_pointer(create_file_name);
             f->R.rax = create(create_file_name, initial_size);
             break;
         case SYS_REMOVE:
-            const char* remove_file_name = f->R.rdi;
+            const char *remove_file_name = f->R.rdi;
             is_valid_pointer(remove_file_name);
             f->R.rax = remove(remove_file_name);
             break;
         case SYS_OPEN:
-            const char* open_file_name = f->R.rdi;
+            const char *open_file_name = f->R.rdi;
             is_valid_pointer(open_file_name);
             f->R.rax = open(open_file_name);
             break;
@@ -98,14 +99,14 @@ void syscall_handler(struct intr_frame *f)
             break;
         case SYS_READ:
             int read_fd = f->R.rdi;
-            void* read_buffer = f->R.rsi;
+            void *read_buffer = f->R.rsi;
             unsigned size = f->R.rdx;
             is_valid_pointer(read_buffer);
             f->R.rax = read(read_fd, read_buffer, size);
             break;
         case SYS_WRITE:
             int write_fd = f->R.rdi;
-            void* write_buffer = f->R.rsi;
+            void *write_buffer = f->R.rsi;
             unsigned length = f->R.rdx;
             is_valid_pointer(write_buffer);
             f->R.rax = write(write_fd, write_buffer, length);
@@ -124,10 +125,12 @@ void syscall_handler(struct intr_frame *f)
             close(close_fd);
             break;
         case SYS_MMAP:
-            printf("dd");
+            is_valid_pointer(f->R.rdi);
+            f->R.rax = mmap(f->R.rdi, f->R.rsi, f->R.rdx, f->R.rcx, f->R.r8);
             break;
         case SYS_MUNMAP:
-            printf("dd");
+            is_valid_pointer(f->R.rdi);
+            munmap(f->R.rdi);
             break;
     }
     // thread_exit ();
@@ -158,7 +161,8 @@ int open(const char *file)
 
     if (f == NULL) return -1;
 
-    for (int fd = 2; fd < 20; fd++) {
+    for (int fd = 2; fd < 20; fd++)
+    {
         if (cur->fdt[fd] == NULL)
         {
             cur->fdt[fd] = f;
@@ -177,7 +181,7 @@ int filesize(int fd)
 
 void exit(int status)
 {
-    thread_current()->exit_status = status; 
+    thread_current()->exit_status = status;
     thread_exit();
 }
 
@@ -191,10 +195,10 @@ tid_t exec(const char *cmd_line)
 {
     tid_t result;
     char *file_copy = palloc_get_page(PAL_ZERO);
-    if(file_copy == NULL) return -1;
-    
+    if (file_copy == NULL) return -1;
+
     strlcpy(file_copy, cmd_line, PGSIZE);
-    
+
     result = process_exec(file_copy);
 
     return result;
@@ -210,18 +214,20 @@ int wait(tid_t pid)
 
 int read(int fd, void *buffer, unsigned size)
 {
+    if(!spt_find_page(&thread_current()->spt, buffer)->writable) exit(-1);
+
     if (fd == 0)
-    { 
+    {
         for (int i = 0; i < size; i++) ((uint8_t *) buffer)[i] = input_getc();
         return size;
     }
 
     struct file *file = get_file_by_fd(fd);
     if (file == NULL) return -1;
-    	
-	lock_acquire(&global_lock);
+
+    lock_acquire(&global_lock);
     int bytes_read = file_read(file, buffer, size);
-	lock_release(&global_lock);
+    lock_release(&global_lock);
 
     return bytes_read;
 }
@@ -233,7 +239,7 @@ int write(int fd, const void *buffer, unsigned size)
         putbuf(buffer, size);
         return size;
     }
-    
+
     struct file *file = get_file_by_fd(fd);
     if (file == NULL) return -1;
 
@@ -263,6 +269,31 @@ unsigned tell(int fd)
 void seek(int fd, unsigned position)
 {
     file_seek(get_file_by_fd(fd), position);
+}
+
+void *mmap(void *addr, size_t length, int writable, int fd, off_t offset)
+{
+    struct thread *cur = thread_current();
+    struct file *file = get_file_by_fd(fd);
+    
+    if(((uintptr_t)addr) % PGSIZE != 0 || (uintptr_t)offset % PGSIZE != 0) return NULL;
+
+    if (file_length(file) == 0 || addr == NULL || length <= 0) return NULL;
+
+    if(!is_user_vaddr(addr) || !is_user_vaddr(addr + length)) return NULL;
+
+    // 매핑하려는 페이지가 이미 존재한
+    if (spt_find_page(&cur->spt, addr)) return NULL;
+
+    // fd가 표준 입출력일 경우, mmap 사용이 불가능하다.
+    if (fd == 0 || fd == 1) return NULL;
+
+    return do_mmap(addr, length, writable, file, offset);
+}
+
+void munmap(void *addr)
+{
+    do_munmap(addr);
 }
 
 static void is_valid_pointer(void *ptr)

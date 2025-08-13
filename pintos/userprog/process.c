@@ -1,5 +1,4 @@
 #include "userprog/process.h"
-#include "userprog/syscall.h"
 
 #include <debug.h>
 #include <inttypes.h>
@@ -7,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
 #include "filesys/directory.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
@@ -19,6 +19,7 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "userprog/gdt.h"
+#include "userprog/syscall.h"
 #include "userprog/tss.h"
 #ifdef VM
 #include "vm/vm.h"
@@ -28,13 +29,6 @@ static void process_cleanup(void);
 static bool load(const char *file_name, struct intr_frame *if_);
 static void initd(void *f_name);
 static void __do_fork(void *);
-
-static struct lazy_load_data {
-    struct file *file;
-    off_t ofs;
-    size_t page_read_bytes;
-    size_t page_zero_bytes;
-};
 
 /* General process initializer for initd and other process. */
 static void process_init(void)
@@ -51,7 +45,7 @@ tid_t process_create_initd(const char *file_name)
 {
     char *fn_copy;
     tid_t tid;
-    char *file_token;  
+    char *file_token;
     char *save_ptr;
     struct list_elem *e;
     struct thread *child;
@@ -59,17 +53,19 @@ tid_t process_create_initd(const char *file_name)
     /* Make a copy of FILE_NAME.
      * Otherwise there's a race between the caller and load(). */
     fn_copy = palloc_get_page(0);  // 실행 파일을 위한 메모리 생성 (memset)
-    
+
     if (fn_copy == NULL) return TID_ERROR;
 
-    strlcpy(fn_copy, file_name, PGSIZE);  // page size - 1(=4KB) 만큼 문자 복사 후 dest 끝에 \n 문자
-    
+    strlcpy(fn_copy, file_name,
+            PGSIZE);  // page size - 1(=4KB) 만큼 문자 복사 후 dest 끝에 \n 문자
+
     file_token = strtok_r(file_name, " ", &save_ptr);
 
     /* Create a new thread to execute FILE_NAME. */
     tid = thread_create(file_token, PRI_DEFAULT, initd, fn_copy);
 
-    if (tid == TID_ERROR){
+    if (tid == TID_ERROR)
+    {
         palloc_free_page(fn_copy);
         return TID_ERROR;
     }
@@ -97,7 +93,8 @@ tid_t process_fork(const char *name, struct intr_frame *if_)
     tid_t child_tid;
     struct thread *child;
     struct fork_data *data = malloc(sizeof(struct fork_data));
-    if(data == NULL) {        
+    if (data == NULL)
+    {
         return -1;
     }
 
@@ -107,19 +104,22 @@ tid_t process_fork(const char *name, struct intr_frame *if_)
     /* Clone current thread to new thread.*/
     child_tid = thread_create(name, PRI_DEFAULT, __do_fork, data);
 
-    if (child_tid == TID_ERROR){
+    if (child_tid == TID_ERROR)
+    {
         free(data);
         return TID_ERROR;
     }
 
-    child = list_entry(list_back(&thread_current()->child_list), struct thread, c_elem);
+    child = list_entry(list_back(&thread_current()->child_list), struct thread,
+                       c_elem);
 
-    sema_down(&child->fork_sema); 
+    sema_down(&child->fork_sema);
 
-    if(child->exit_status == -1) {
+    if (child->exit_status == -1)
+    {
         return child->exit_status;
     }
-    
+
     return child_tid;
 }
 
@@ -138,10 +138,13 @@ static bool duplicate_pte(uint64_t *pte, void *va, void *aux)
     if (is_kernel_vaddr(va) || is_kern_pte(pte)) return true;
 
     /* 2. Resolve VA from the parent's page map level 4. */
-    parent_page = pml4_get_page(parent->pml4, va);  // parent의 pml4d에서 가상 메모리랑 대응되는 물리 주소를 가져온다
+    parent_page = pml4_get_page(
+        parent->pml4,
+        va);  // parent의 pml4d에서 가상 메모리랑 대응되는 물리 주소를 가져온다
     if (parent_page == NULL) return false;
 
-    /* 3. TODO: Allocate new PAL_USER page for the child and set result to NEWPAGE */
+    /* 3. TODO: Allocate new PAL_USER page for the child and set result to
+     * NEWPAGE */
     newpage = palloc_get_page(PAL_USER);
     if (newpage == NULL) return false;
 
@@ -193,7 +196,8 @@ static void __do_fork(void *aux)
 
     for (int i = 2; i < 20; i++)
     {
-        if (parent->fdt[i]){
+        if (parent->fdt[i])
+        {
             current->fdt[i] = file_duplicate(parent->fdt[i]);
         }
     }
@@ -234,7 +238,8 @@ int process_exec(void *f_name)
 
     // 5. 실패 시 처리
     palloc_free_page(file_name);
-    if (!success){
+    if (!success)
+    {
         return -1;
     }
 
@@ -257,7 +262,8 @@ int process_wait(tid_t child_tid)
     struct thread *parent = thread_current();
     int child_exit_status = -1;
 
-    for (e = list_begin(&parent->child_list); e != list_end(&parent->child_list); e = list_next(e))
+    for (e = list_begin(&parent->child_list);
+         e != list_end(&parent->child_list); e = list_next(e))
     {
         child = list_entry(e, struct thread, c_elem);
         if (child_tid == child->tid)
@@ -282,11 +288,11 @@ int process_wait(tid_t child_tid)
 void process_exit(void)
 {
     struct thread *curr = thread_current();
-    struct elem * e;
-    
+    struct elem *e;
+
     if (curr->pml4 != NULL)
         printf("%s: exit(%d)\n", curr->name, curr->exit_status);
-        
+
     for (int fd = 2; fd < 20; fd++)
     {
         if (curr->fdt[fd] != NULL)
@@ -295,21 +301,20 @@ void process_exit(void)
             curr->fdt[fd] = NULL;
         }
     }
-    
+
     curr->next_fd = 2;
-    
+
     if (curr->running_file)
     {
         file_close(curr->running_file);
         curr->running_file = NULL;
     }
-    
-    free (curr->fdt);
+
+    free(curr->fdt);
     process_cleanup();
-    
+
     sema_up(&curr->wait_sema);
     sema_down(&curr->exit_sema);
-    
 }
 
 /* Free the current process's resources. */
@@ -343,7 +348,8 @@ static void process_cleanup(void)
 /* Sets up the CPU for running user code in the nest thread.
  * This function is called on every context switch. */
 void process_activate(struct thread *next)
-{   // 왜 next일까? -> // 현재 스레드에서 다음 스레드로 전환 즉, process_activate(next);  "다음" 스레드를 활성화
+{  // 왜 next일까? -> // 현재 스레드에서 다음 스레드로 전환 즉,
+   // process_activate(next);  "다음" 스레드를 활성화
     /* Activate thread's page tables. */
     pml4_activate(next->pml4);
 
@@ -418,7 +424,7 @@ static bool load_segment(struct file *file, off_t ofs, uint8_t *upage,
  * Returns true if successful, false otherwise. */
 static bool load(const char *file_name, struct intr_frame *if_)
 {
-    lock_acquire(&global_lock); 
+    lock_acquire(&global_lock);
     static char *argv_addrs[LOADER_ARGS_LEN / 2 + 1];
     static char *argv[LOADER_ARGS_LEN / 2 + 1];
 
@@ -452,9 +458,9 @@ static bool load(const char *file_name, struct intr_frame *if_)
     target_file = argv[0];
 
     /* Open executable file. */
-    
+
     file = filesys_open(target_file);  // 디스크에서 실행 파일을 열어서 읽기
-    
+
     if (file == NULL)
     {
         printf("load: %s: open failed\n", target_file);
@@ -540,10 +546,8 @@ static bool load(const char *file_name, struct intr_frame *if_)
         }
     }
 
-    
     file_deny_write(file);
     t->running_file = file;
-	
 
     /* Set up stack. */
     if (!setup_stack(if_)) goto done;
@@ -707,12 +711,16 @@ static bool setup_stack(struct intr_frame *if_)
     uint8_t *kpage;
     bool success = false;
 
-    kpage = palloc_get_page(PAL_USER | PAL_ZERO);  // 물리 메모리에서 4KB 페이지 할당 0으로 초기화
+    kpage = palloc_get_page(
+        PAL_USER | PAL_ZERO);  // 물리 메모리에서 4KB 페이지 할당 0으로 초기화
     if (kpage != NULL)
     {
-        success = install_page(((uint8_t *) USER_STACK) - PGSIZE, kpage,true);    // USER_STACK 주소에서 - 페이지 크기 => 스택의 맨 아래
+        success = install_page(
+            ((uint8_t *) USER_STACK) - PGSIZE, kpage,
+            true);    // USER_STACK 주소에서 - 페이지 크기 => 스택의 맨 아래
         if (success)  // kpage에 가상 주소 USER_SATCK - PGSIZE <-> 물리주소 매핑
-            if_->rsp = USER_STACK;  // 페이지 할당되면, rsp(스택 포인터)가 USER_STACK 주소를 가리킴
+            if_->rsp = USER_STACK;  // 페이지 할당되면, rsp(스택 포인터)가
+                                    // USER_STACK 주소를 가리킴
         else
             palloc_free_page(kpage);
     }
@@ -742,17 +750,18 @@ static bool install_page(void *upage, void *kpage, bool writable)
  * If you want to implement the function for only project 2, implement it on the
  * upper block. */
 
-static bool lazy_load_segment(struct page *page, void *aux)
+bool lazy_load_segment(struct page *page, void *aux)
 {
     /* TODO: Load the segment from the file */
     /* TODO: This called when the first page fault occurs on address VA. */
     /* TODO: VA is available when calling this function. */
     struct thread *cur = thread_current();
-    struct lazy_load_data *data = (struct lazy_load_data*) aux;
+    struct lazy_load_data *data = (struct lazy_load_data *) aux;
 
     uint8_t *kva = page->frame->kva;
 
-    if (file_read_at(data->file, kva, data->page_read_bytes, data->ofs) != (int) data->page_read_bytes)
+    if (file_read_at(data->file, kva, data->page_read_bytes, data->ofs) !=
+        (int) data->page_read_bytes)
     {
         free(data);
         palloc_free_page(kva);
@@ -795,20 +804,20 @@ static bool load_segment(struct file *file, off_t ofs, uint8_t *upage,
         size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
         /* TODO: Set up aux to pass information to the lazy_load_segment. */
-        struct lazy_load_data *data = (struct lazy_load_data *)malloc(sizeof(struct lazy_load_data));
-        if(data == NULL)         
-            return false;
+        struct lazy_load_data *data =
+            (struct lazy_load_data *) malloc(sizeof(struct lazy_load_data));
+        if (data == NULL) return false;
 
         data->file = file;
         data->ofs = ofs;
         data->page_read_bytes = page_read_bytes;
-        data->page_zero_bytes= page_zero_bytes;
+        data->page_zero_bytes = page_zero_bytes;
 
-        if (!vm_alloc_page_with_initializer(VM_ANON, upage, writable, lazy_load_segment, data))
+        if (!vm_alloc_page_with_initializer(VM_ANON, upage, writable,
+                                            lazy_load_segment, data))
         {
             free(data);
             return false;
-
         }
 
         /* Advance. */
@@ -830,17 +839,16 @@ static bool setup_stack(struct intr_frame *if_)
     bool success = false;
     void *stack_bottom = (void *) (((uint8_t *) USER_STACK) - PGSIZE);
 
-    if(!vm_alloc_page(VM_ANON | VM_MARKER_0, stack_bottom, true))
-        return false;
-
+    if (!vm_alloc_page(VM_ANON | VM_MARKER_0, stack_bottom, true)) return false;
 
     success = vm_claim_page(stack_bottom);
-    
-    if(success) {
+
+    if (success)
+    {
         if_->rsp = USER_STACK;
         thread_current()->stack_bottom = stack_bottom;
     }
-    
+
     return success;
 }
 #endif /* VM */
