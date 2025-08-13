@@ -126,7 +126,7 @@ void syscall_handler(struct intr_frame *f)
             break;
         case SYS_MMAP:
             is_valid_pointer(f->R.rdi);
-            f->R.rax = mmap(f->R.rdi, f->R.rsi, f->R.rdx, f->R.rcx, f->R.r8);
+            f->R.rax = mmap(f->R.rdi, f->R.rsi, f->R.rdx, f->R.r10, f->R.r8);
             break;
         case SYS_MUNMAP:
             is_valid_pointer(f->R.rdi);
@@ -274,26 +274,34 @@ void seek(int fd, unsigned position)
 void *mmap(void *addr, size_t length, int writable, int fd, off_t offset)
 {
     struct thread *cur = thread_current();
-    struct file *file = get_file_by_fd(fd);
+    
+    if (fd == 0 || fd == 1) return NULL;
+    
+    if (!addr || addr == 0 || addr == NULL || length <= 0) return NULL;
     
     if(((uintptr_t)addr) % PGSIZE != 0 || (uintptr_t)offset % PGSIZE != 0) return NULL;
-
-    if (file_length(file) == 0 || addr == NULL || length <= 0) return NULL;
-
+    
     if(!is_user_vaddr(addr) || !is_user_vaddr(addr + length)) return NULL;
-
-    // 매핑하려는 페이지가 이미 존재한
+    
     if (spt_find_page(&cur->spt, addr)) return NULL;
+    
+    struct file *file = get_file_by_fd(fd);
+    if(file == NULL) return NULL;
 
-    // fd가 표준 입출력일 경우, mmap 사용이 불가능하다.
-    if (fd == 0 || fd == 1) return NULL;
+    if(file_length(file) == 0) return NULL;
 
-    return do_mmap(addr, length, writable, file, offset);
+    lock_acquire(&global_lock);
+    void *ret = do_mmap(addr, length, writable, file, offset);
+    lock_release(&global_lock);
+
+    return ret;
 }
 
 void munmap(void *addr)
 {
+    lock_acquire(&global_lock);
     do_munmap(addr);
+    lock_release(&global_lock);
 }
 
 static void is_valid_pointer(void *ptr)
