@@ -141,7 +141,11 @@ void halt(void)
 
 bool create(const char *file, unsigned initial_size)
 {
-    return filesys_create(file, initial_size);
+    bool success = false;
+    lock_acquire(&global_lock);
+    success = filesys_create(file, initial_size);
+    lock_release(&global_lock);
+    return success;
 }
 
 bool remove(const char *file)
@@ -255,7 +259,9 @@ void close(int fd)
 
     if ((target = get_file_by_fd(fd)) == NULL) return;
 
+    lock_acquire(&global_lock);
     file_close(target);
+    lock_release(&global_lock);
     cur->fdt[fd] = NULL;
 }
 
